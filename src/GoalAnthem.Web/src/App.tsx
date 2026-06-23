@@ -1,4 +1,4 @@
-import { DemoMatchList } from './features/matches/DemoMatchList';
+import { MatchSetupFlow } from './features/setup/MatchSetupFlow';
 
 export function App() {
   return (
@@ -10,7 +10,7 @@ export function App() {
           Pick a deterministic demo match to begin the flow. Spotify and live data are intentionally not required for this demo.
         </p>
       </section>
-      <DemoMatchList />
+      <MatchSetupFlow />
     </main>
   );
 }

@@ -3,11 +3,17 @@ import { DemoMatch, getDemoMatches } from './demoMatchesApi';
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'loaded'; matches: DemoMatch[]; selectedMatchId?: string }
+  | { status: 'loaded'; matches: DemoMatch[] }
   | { status: 'empty' }
   | { status: 'error'; message: string };
 
-export function DemoMatchList() {
+type DemoMatchListProps = {
+  // eslint-disable-next-line no-unused-vars
+  onMatchSelect: (match: DemoMatch) => void;
+  selectedMatchId?: string;
+};
+
+export function DemoMatchList({ onMatchSelect, selectedMatchId }: DemoMatchListProps) {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
 
   useEffect(() => {
@@ -55,14 +61,15 @@ export function DemoMatchList() {
       </div>
       <div className="match-grid">
         {state.matches.map((match) => {
-          const isSelected = match.id === state.selectedMatchId;
+          const isSelected = match.id === selectedMatchId;
 
           return (
             <button
               className="match-card"
               data-selected={isSelected}
+              aria-pressed={isSelected}
               key={match.id}
-              onClick={() => setState({ ...state, selectedMatchId: match.id })}
+              onClick={() => onMatchSelect(match)}
               type="button"
             >
               <span className="match-card__status">{match.status}</span>
@@ -72,7 +79,7 @@ export function DemoMatchList() {
               <time className="match-card__time" dateTime={match.kickoffTime}>
                 {formatKickoff(match.kickoffTime)}
               </time>
-              <span className="match-card__action">{isSelected ? 'Selected' : 'Choose match'}</span>
+              <span className="match-card__action">{isSelected ? 'Selected match' : 'Choose match'}</span>
             </button>
           );
         })}
