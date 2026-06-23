@@ -1,0 +1,238 @@
+using System.Net;
+using System.Net.Http.Headers;
+using System.Text.Json;
+using GoalAnthem.Application.Matches.GetMatches;
+using GoalAnthem.Domain.Matches;
+using GoalAnthem.Infrastructure.DemoMatches;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+
+namespace GoalAnthem.Infrastructure.Matches;
+
+public sealed class ConfiguredMatchProvider(
+    DemoMatchFileDataSource demoMatches,
+    IHttpClientFactory httpClientFactory,
+    IOptions<FootballDataOptions> options,
+    ILogger<ConfiguredMatchProvider> logger,
+    TimeProvider timeProvider)
+    : IMatchProvider, IMatchProviderHealthReader
+{
+    private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
+    private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
+    private static readonly TimeSpan MinimumRefreshInterval = TimeSpan.FromSeconds(15);
+    private readonly SemaphoreSlim refreshLock = new(1, 1);
+    private CacheEntry? cache;
+    private DateTimeOffset? lastRefreshAttempt;
+    private DateTimeOffset? lastFailedFetch;
+    private string? lastFailure;
+
+    public async Task<MatchProviderResult> GetMatchesAsync(MatchProviderRequest request, CancellationToken cancellationToken)
+    {
+        var now = timeProvider.GetUtcNow();
+        var token = options.Value.ApiToken;
+
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return await GetDemoFallbackAsync("Demo data is shown because live World Cup data is not configured.", cancellationToken);
+        }
+
+        if (!request.ForceRefresh && TryGetFreshCache(now, out var cached))
+        {
+            return cached.Result;
+        }
+
+        if (request.ForceRefresh && cache is not null && lastRefreshAttempt is not null && now - lastRefreshAttempt < MinimumRefreshInterval)
+        {
+            return cache.Result with { Message = "Refresh skipped briefly to protect the free upstream API." };
+        }
+
+        await refreshLock.WaitAsync(cancellationToken);
+        try
+        {
+            now = timeProvider.GetUtcNow();
+            if (!request.ForceRefresh && TryGetFreshCache(now, out cached))
+            {
+                return cached.Result;
+            }
+
+            if (request.ForceRefresh && cache is not null && lastRefreshAttempt is not null && now - lastRefreshAttempt < MinimumRefreshInterval)
+            {
+                return cache.Result with { Message = "Refresh skipped briefly to protect the free upstream API." };
+            }
+
+            lastRefreshAttempt = now;
+
+            try
+            {
+                var matches = await FetchWorldCupMatchesAsync(token, cancellationToken);
+                var result = new MatchProviderResult(matches, MatchDataSource.LiveWorldCup, now, IsFallback: false, Message: null);
+                cache = new CacheEntry(result, now.Add(CacheDuration));
+                lastFailure = null;
+                lastFailedFetch = null;
+
+                return result;
+            }
+            catch (FootballDataRateLimitException exception)
+            {
+                logger.LogWarning(exception, "football-data.org rate limit was reached while loading World Cup matches.");
+                return await HandleProviderFailureAsync(now, "Live World Cup data is temporarily rate-limited.", cancellationToken);
+            }
+            catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
+            {
+                logger.LogWarning(exception, "Live World Cup match provider failed. Falling back safely.");
+                return await HandleProviderFailureAsync(now, "Live World Cup data is temporarily unavailable.", cancellationToken);
+            }
+        }
+        finally
+        {
+            refreshLock.Release();
+        }
+    }
+
+    public MatchProviderHealth GetHealth()
+    {
+        var activeSource = cache?.Result.Source == MatchDataSource.LiveWorldCup ? "liveWorldCup" : "demo";
+
+        return new MatchProviderHealth(
+            LiveProviderConfigured: !string.IsNullOrWhiteSpace(options.Value.ApiToken),
+            activeSource,
+            cache?.Result.FetchedAt,
+            lastFailedFetch,
+            lastFailure);
+    }
+
+    private bool TryGetFreshCache(DateTimeOffset now, out CacheEntry cached)
+    {
+        if (cache is not null && cache.ExpiresAt > now)
+        {
+            cached = cache;
+            return true;
+        }
+
+        cached = default!;
+        return false;
+    }
+
+    private async Task<MatchProviderResult> HandleProviderFailureAsync(
+        DateTimeOffset now,
+        string message,
+        CancellationToken cancellationToken)
+    {
+        lastFailedFetch = now;
+        lastFailure = message;
+
+        if (cache is not null)
+        {
+            return cache.Result with { Message = $"{message} Showing the last successful response." };
+        }
+
+        return await GetDemoFallbackAsync($"{message} Showing deterministic demo data instead.", cancellationToken);
+    }
+
+    private async Task<MatchProviderResult> GetDemoFallbackAsync(string message, CancellationToken cancellationToken)
+    {
+        var matches = await demoMatches.GetDemoMatchesAsync(cancellationToken);
+
+        return new MatchProviderResult(
+            matches,
+            MatchDataSource.Demo,
+            timeProvider.GetUtcNow(),
+            IsFallback: true,
+            message);
+    }
+
+    private async Task<IReadOnlyList<DemoMatch>> FetchWorldCupMatchesAsync(string token, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(
+            HttpMethod.Get,
+            "v4/competitions/WC/matches?status=SCHEDULED,TIMED,IN_PLAY,PAUSED");
+        request.Headers.Add("X-Auth-Token", token);
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+        var client = httpClientFactory.CreateClient("FootballData");
+        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+        if (response.StatusCode == (HttpStatusCode)429)
+        {
+            throw new FootballDataRateLimitException();
+        }
+
+        response.EnsureSuccessStatusCode();
+
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var document = await JsonSerializer.DeserializeAsync<FootballDataMatchesResponse>(stream, JsonOptions, cancellationToken);
+
+        if (document?.Matches is null)
+        {
+            throw new InvalidOperationException("football-data.org returned a malformed match response.");
+        }
+
+        return document.Matches
+            .Select(Map)
+            .Where(match => match is not null)
+            .Cast<DemoMatch>()
+            .OrderBy(match => match.KickoffTime)
+            .ThenBy(match => match.Id.Value, StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static DemoMatch? Map(FootballDataMatchRecord record)
+    {
+        if (record.Id is null or <= 0 ||
+            string.IsNullOrWhiteSpace(record.UtcDate) ||
+            record.HomeTeam?.Id is null or <= 0 ||
+            record.AwayTeam?.Id is null or <= 0 ||
+            string.IsNullOrWhiteSpace(record.HomeTeam.Name) ||
+            string.IsNullOrWhiteSpace(record.AwayTeam.Name) ||
+            !DateTimeOffset.TryParse(record.UtcDate, out var kickoffTime) ||
+            !TryMapStatus(record.Status, out var status))
+        {
+            return null;
+        }
+
+        return DemoMatch.Create(
+            new MatchId($"football-data-wc-{record.Id.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"),
+            kickoffTime,
+            status,
+            Team.Create(
+                new TeamId($"football-data-team-{record.HomeTeam.Id.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"),
+                record.HomeTeam.Name),
+            Team.Create(
+                new TeamId($"football-data-team-{record.AwayTeam.Id.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"),
+                record.AwayTeam.Name));
+    }
+
+    private static bool TryMapStatus(string? value, out MatchStatus status)
+    {
+        status = MatchStatus.Upcoming;
+
+        switch (value?.ToUpperInvariant())
+        {
+            case "SCHEDULED":
+            case "TIMED":
+                status = MatchStatus.Upcoming;
+                return true;
+            case "IN_PLAY":
+            case "PAUSED":
+                status = MatchStatus.Live;
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private sealed record CacheEntry(MatchProviderResult Result, DateTimeOffset ExpiresAt);
+
+    private sealed record FootballDataMatchesResponse(IReadOnlyList<FootballDataMatchRecord>? Matches);
+
+    private sealed record FootballDataMatchRecord(
+        int? Id,
+        string? UtcDate,
+        string? Status,
+        FootballDataTeamRecord? HomeTeam,
+        FootballDataTeamRecord? AwayTeam);
+
+    private sealed record FootballDataTeamRecord(int? Id, string? Name);
+
+    private sealed class FootballDataRateLimitException : Exception;
+}

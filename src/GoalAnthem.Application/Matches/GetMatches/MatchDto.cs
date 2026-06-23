@@ -1,6 +1,6 @@
-namespace GoalAnthem.Application.Matches.GetDemoMatches;
+namespace GoalAnthem.Application.Matches.GetMatches;
 
-public sealed record DemoMatchDto(
+public sealed record MatchDto(
     string Id,
     DateTimeOffset KickoffTime,
     string Status,
