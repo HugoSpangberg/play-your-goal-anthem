@@ -11,7 +11,7 @@ export type Team = {
   name: string;
 };
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5188';
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
 
 export async function getDemoMatches(signal?: AbortSignal): Promise<DemoMatch[]> {
   const response = await fetch(`${apiBaseUrl}/api/demo-matches`, { signal });

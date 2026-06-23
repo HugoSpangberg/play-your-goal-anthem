@@ -25,7 +25,7 @@ dotnet run --project src/GoalAnthem.Api
 npm run dev --prefix src/GoalAnthem.Web
 ```
 
-Open `http://localhost:5173`. The API runs on `http://localhost:5188` by default.
+Open `http://localhost:5173`. The Vite dev server proxies `/api` to `http://localhost:5000`.
 
 Docker Compose:
 
