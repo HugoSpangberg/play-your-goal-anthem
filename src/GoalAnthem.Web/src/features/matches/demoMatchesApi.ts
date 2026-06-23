@@ -11,15 +11,30 @@ export type Team = {
   name: string;
 };
 
+export type MatchDataSource = 'demo' | 'liveWorldCup';
+
+export type MatchesResponse = {
+  matches: DemoMatch[];
+  source: MatchDataSource;
+  fetchedAt: string;
+  isFallback: boolean;
+  message: string | null;
+};
+
 const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? '';
 
-export async function getDemoMatches(signal?: AbortSignal): Promise<DemoMatch[]> {
-  const response = await fetch(`${apiBaseUrl}/api/demo-matches`, { signal });
+export async function getMatches({ forceRefresh = false, signal }: { forceRefresh?: boolean; signal?: AbortSignal } = {}): Promise<MatchesResponse> {
+  const url = new URL(`${apiBaseUrl}/api/matches`, window.location.origin);
 
-  if (!response.ok) {
-    throw new Error(`Demo matches could not be loaded. Status: ${response.status}`);
+  if (forceRefresh) {
+    url.searchParams.set('refresh', 'true');
   }
 
-  const matches = (await response.json()) as DemoMatch[];
-  return matches;
+  const response = await fetch(url.toString(), { signal });
+
+  if (!response.ok) {
+    throw new Error(`Matches could not be loaded. Status: ${response.status}`);
+  }
+
+  return (await response.json()) as MatchesResponse;
 }

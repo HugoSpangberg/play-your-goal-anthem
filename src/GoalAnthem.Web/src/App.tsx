@@ -7,7 +7,7 @@ export function App() {
         <p className="eyebrow">GoalAnthem</p>
         <h1 id="page-title">Your team scores. Your anthem plays.</h1>
         <p className="intro">
-          Pick a deterministic demo match to begin the flow. Spotify and live data are intentionally not required for this demo.
+          Pick a match to begin the flow. The demo works without Spotify, paid services, or live provider configuration.
         </p>
       </section>
       <MatchSetupFlow />
