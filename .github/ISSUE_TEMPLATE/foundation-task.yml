@@ -1,0 +1,19 @@
+name: Feature slice
+description: Track a focused product or technical slice.
+title: "Feature: "
+labels: ["feature"]
+body:
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Outcome
+      description: What should be true when this work is complete?
+    validations:
+      required: true
+  - type: textarea
+    id: checks
+    attributes:
+      label: Verification
+      description: Which commands or manual checks prove the change works?
+    validations:
+      required: true
