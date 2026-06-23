@@ -539,7 +539,7 @@ function ReadyStep({ draft, onBackToCuePoint, onStartMatch }: ReadyStepProps) {
             onChange={() => setSpeed('demo')}
             type="radio"
           />
-          Demo speed
+          Demo speed (15x)
         </label>
         <label>
           <input
@@ -548,7 +548,7 @@ function ReadyStep({ draft, onBackToCuePoint, onStartMatch }: ReadyStepProps) {
             onChange={() => setSpeed('normal')}
             type="radio"
           />
-          Normal speed
+          Normal speed (1x)
         </label>
       </fieldset>
 
@@ -566,7 +566,8 @@ type MatchModeStepProps = {
 };
 
 function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
-  const { audioRef, playFromCue, preview, stopPreview } = useAnthemPreview(draft.anthemSelection);
+  const { match, supportedTeam, anthemSelection, cuePointSeconds } = draft;
+  const { audioRef, playFromCue, preview, stopPreview } = useAnthemPreview(anthemSelection);
   const [snapshot, setSnapshot] = useState<MatchSnapshot>(() => createInitialMatchSnapshot());
   const [lastAnthemStatus, setLastAnthemStatus] = useState('Waiting for a supported-team goal.');
   const [lastSyncStatus, setLastSyncStatus] = useState('Kickoff synchronized from Start match.');
@@ -574,14 +575,14 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
 
   useEffect(() => {
     const engine = new MatchSimulationEngine({
-      events: getDemoMatchEvents(draft.match),
-      match: draft.match,
+      events: getDemoMatchEvents(match),
+      match,
       scheduler: createBrowserScheduler(),
       speed,
-      supportedTeamId: draft.supportedTeam.id,
+      supportedTeamId: supportedTeam.id,
       onGoalForSupportedTeam: (event) => {
         setLastAnthemStatus(`Playing anthem for ${event.label}.`);
-        void playFromCue(draft.cuePointSeconds);
+        void playFromCue(cuePointSeconds);
       },
       onSnapshot: (nextSnapshot) => {
         setSnapshot(nextSnapshot);
@@ -601,7 +602,7 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
       engineRef.current = null;
       stopPreview();
     };
-  }, [draft, playFromCue, speed, stopPreview]);
+  }, [cuePointSeconds, match, playFromCue, speed, stopPreview, supportedTeam.id]);
 
   return (
     <section className="match-mode" aria-labelledby="match-mode-title">
@@ -610,7 +611,7 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
           <p className="step-label">Live match mode</p>
           <h3 id="match-mode-title">Match mode</h3>
           <p className="setup-section__summary">
-            {draft.match.homeTeam.name} vs {draft.match.awayTeam.name}
+            {match.homeTeam.name} vs {match.awayTeam.name}
           </p>
         </div>
         <button
@@ -630,7 +631,7 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
 
       <div className="scoreboard" aria-live="polite">
         <div className="scoreboard__team">
-          <span>{draft.match.homeTeam.name}</span>
+          <span>{match.homeTeam.name}</span>
           <strong>{snapshot.homeScore}</strong>
         </div>
         <div className="scoreboard__clock">
@@ -639,7 +640,7 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
           <span>{formatMatchStatus(snapshot.status)}</span>
         </div>
         <div className="scoreboard__team">
-          <span>{draft.match.awayTeam.name}</span>
+          <span>{match.awayTeam.name}</span>
           <strong>{snapshot.awayScore}</strong>
         </div>
       </div>
@@ -647,7 +648,7 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
       <dl className="match-status-grid">
         <div>
           <dt>Supported team</dt>
-          <dd>{draft.supportedTeam.name}</dd>
+          <dd>{supportedTeam.name}</dd>
         </div>
         <div>
           <dt>Anthem status</dt>
@@ -659,7 +660,7 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
         </div>
         <div>
           <dt>Speed</dt>
-          <dd>{speed === 'demo' ? 'Demo speed' : 'Normal speed'}</dd>
+          <dd>{speed === 'demo' ? 'Demo speed (15x)' : 'Normal speed (1x)'}</dd>
         </div>
       </dl>
 
@@ -668,7 +669,7 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
           className="primary-action primary-action--large"
           onClick={() => {
             setLastAnthemStatus('Manual goal playback started.');
-            void playFromCue(draft.cuePointSeconds);
+            void playFromCue(cuePointSeconds);
           }}
           type="button"
         >

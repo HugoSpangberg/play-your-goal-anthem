@@ -159,10 +159,10 @@ describe('MatchSetupFlow', () => {
     expect(screen.getByText("Synchronized at 0' from local kickoff.")).toBeInTheDocument();
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(56_000);
     });
 
-    expect(screen.getByText("15'")).toBeInTheDocument();
+    expect(screen.getAllByText("14'").length).toBeGreaterThan(0);
     expect(screen.getByText('North Harbor FC goal')).toBeInTheDocument();
     expect(screen.getByText('1-0')).toBeInTheDocument();
     expect(screen.getByText('Playing anthem for North Harbor FC goal.')).toBeInTheDocument();
@@ -178,7 +178,7 @@ describe('MatchSetupFlow', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(56_000);
     });
 
     expect(screen.getByText('North Harbor FC goal')).toBeInTheDocument();
@@ -195,15 +195,15 @@ describe('MatchSetupFlow', () => {
     const user = userEvent.setup();
 
     await completeDemoSetup(user, 'North Harbor FC');
-    await user.click(screen.getByLabelText('Normal speed'));
+    await user.click(screen.getByLabelText('Normal speed (1x)'));
     vi.useFakeTimers();
     fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(1000);
+      await vi.advanceTimersByTimeAsync(60_000);
     });
 
-    expect(screen.getByText("1'")).toBeInTheDocument();
+    expect(screen.getAllByText("1'").length).toBeGreaterThan(0);
     expect(playSpy).not.toHaveBeenCalled();
 
     fireEvent.click(screen.getByRole('button', { name: 'Goal! Play anthem now' }));
@@ -214,11 +214,11 @@ describe('MatchSetupFlow', () => {
   });
 
   it('cleans up audio and timers when leaving match mode', async () => {
-    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
     const user = userEvent.setup();
 
     await completeDemoSetup(user, 'North Harbor FC');
     vi.useFakeTimers();
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
     fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
     fireEvent.click(screen.getByRole('button', { name: 'End match mode' }));
 
@@ -226,6 +226,41 @@ describe('MatchSetupFlow', () => {
     expect(clearIntervalSpy).toHaveBeenCalled();
     expect(pauseSpy).toHaveBeenCalled();
     expect(revokeObjectUrlMock).toHaveBeenCalled();
+  });
+
+  it('does not restart the match engine when snapshot updates trigger rerenders', async () => {
+    const user = userEvent.setup();
+
+    await completeDemoSetup(user, 'North Harbor FC');
+
+    vi.useFakeTimers();
+    const setIntervalSpy = vi.spyOn(window, 'setInterval');
+    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
+    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
+
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(56_000);
+    });
+
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(1);
+    expect(screen.getAllByText('Kickoff')).toHaveLength(1);
+    expect(screen.getAllByText('North Harbor FC goal')).toHaveLength(1);
+    expect(playSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(56_000);
+    });
+
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+    expect(vi.getTimerCount()).toBe(1);
+    expect(screen.getAllByText('Kickoff')).toHaveLength(1);
+    expect(screen.getAllByText('North Harbor FC goal')).toHaveLength(1);
+    expect(playSpy).toHaveBeenCalledTimes(1);
+    expect(clearIntervalSpy).not.toHaveBeenCalled();
   });
 });
 

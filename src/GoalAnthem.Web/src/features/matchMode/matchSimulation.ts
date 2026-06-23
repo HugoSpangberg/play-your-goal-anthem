@@ -30,11 +30,16 @@ export type MatchSnapshot = {
   timeline: ProcessedMatchEvent[];
 };
 
+// eslint-disable-next-line no-unused-vars
+type GoalHandler = (event: ProcessedMatchEvent) => void;
+// eslint-disable-next-line no-unused-vars
+type SnapshotHandler = (snapshot: MatchSnapshot) => void;
+type SetIntervalFn = typeof window.setInterval;
+type ClearIntervalFn = typeof window.clearInterval;
+
 export type MatchScheduler = {
-  // eslint-disable-next-line no-unused-vars
-  setInterval(callback: () => void, delayMs: number): number;
-  // eslint-disable-next-line no-unused-vars
-  clearInterval(timerId: number): void;
+  setInterval: SetIntervalFn;
+  clearInterval: ClearIntervalFn;
 };
 
 type MatchEngineOptions = {
@@ -43,16 +48,16 @@ type MatchEngineOptions = {
   scheduler: MatchScheduler;
   speed: MatchSpeed;
   supportedTeamId: Team['id'];
-  // eslint-disable-next-line no-unused-vars
-  onGoalForSupportedTeam: (event: ProcessedMatchEvent) => void;
-  // eslint-disable-next-line no-unused-vars
-  onSnapshot: (snapshot: MatchSnapshot) => void;
+  onGoalForSupportedTeam: GoalHandler;
+  onSnapshot: SnapshotHandler;
 };
 
-const speedSecondsPerTick: Record<MatchSpeed, number> = {
+const matchSecondsPerTick: Record<MatchSpeed, number> = {
   normal: 1,
   demo: 15,
 };
+
+const minute = (value: number) => value * 60;
 
 export function getDemoMatchEvents(match: DemoMatch): readonly MatchEvent[] {
   return [
@@ -64,40 +69,40 @@ export function getDemoMatchEvents(match: DemoMatch): readonly MatchEvent[] {
     },
     {
       id: `${match.id}-home-goal-1`,
-      atSecond: 14,
+      atSecond: minute(14),
       type: 'goal',
       teamId: match.homeTeam.id,
       label: `${match.homeTeam.name} goal`,
     },
     {
       id: `${match.id}-half-time`,
-      atSecond: 45,
+      atSecond: minute(45),
       type: 'half-time',
       label: 'Half-time',
     },
     {
       id: `${match.id}-second-half`,
-      atSecond: 50,
+      atSecond: minute(46),
       type: 'second-half',
       label: 'Second half',
     },
     {
       id: `${match.id}-away-goal-1`,
-      atSecond: 66,
+      atSecond: minute(66),
       type: 'goal',
       teamId: match.awayTeam.id,
       label: `${match.awayTeam.name} goal`,
     },
     {
       id: `${match.id}-home-goal-2`,
-      atSecond: 82,
+      atSecond: minute(82),
       type: 'goal',
       teamId: match.homeTeam.id,
       label: `${match.homeTeam.name} goal`,
     },
     {
       id: `${match.id}-full-time`,
-      atSecond: 90,
+      atSecond: minute(90),
       type: 'full-time',
       label: 'Full-time',
     },
@@ -116,13 +121,13 @@ export function createInitialMatchSnapshot(): MatchSnapshot {
 
 export function createBrowserScheduler(): MatchScheduler {
   return {
-    setInterval: (callback, delayMs) => window.setInterval(callback, delayMs),
-    clearInterval: (timerId) => window.clearInterval(timerId),
+    setInterval: window.setInterval.bind(window),
+    clearInterval: window.clearInterval.bind(window),
   };
 }
 
 export function formatMatchClock(elapsedSeconds: number) {
-  const minute = Math.max(0, Math.floor(elapsedSeconds));
+  const minute = Math.max(0, Math.floor(elapsedSeconds / 60));
 
   return `${minute}'`;
 }
@@ -140,16 +145,14 @@ export class MatchSimulationEngine {
   private readonly scheduler: MatchScheduler;
   private readonly secondsPerTick: number;
   private readonly supportedTeamId: Team['id'];
-  // eslint-disable-next-line no-unused-vars
-  private readonly onGoalForSupportedTeam: (event: ProcessedMatchEvent) => void;
-  // eslint-disable-next-line no-unused-vars
-  private readonly onSnapshot: (snapshot: MatchSnapshot) => void;
+  private readonly onGoalForSupportedTeam: GoalHandler;
+  private readonly onSnapshot: SnapshotHandler;
 
   constructor(options: MatchEngineOptions) {
     this.events = [...options.events].sort((first, second) => first.atSecond - second.atSecond);
     this.match = options.match;
     this.scheduler = options.scheduler;
-    this.secondsPerTick = speedSecondsPerTick[options.speed];
+    this.secondsPerTick = matchSecondsPerTick[options.speed];
     this.supportedTeamId = options.supportedTeamId;
     this.onGoalForSupportedTeam = options.onGoalForSupportedTeam;
     this.onSnapshot = options.onSnapshot;
