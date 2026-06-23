@@ -141,7 +141,7 @@ function MatchSectionHeader({
 }
 
 function formatSource(source: MatchesResponse['source']) {
-  return source === 'liveWorldCup' ? 'Live World Cup data' : 'Demo data';
+  return source === 'liveWorldCup' ? 'World Cup API data' : 'Demo data';
 }
 
 function formatFreshness(value: string) {
