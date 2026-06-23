@@ -1,5 +1,7 @@
 using GoalAnthem.Application.Matches.GetMatches;
+using GoalAnthem.Application.MatchSessions;
 using GoalAnthem.Infrastructure.DemoMatches;
+using GoalAnthem.Infrastructure.MatchSessions;
 using GoalAnthem.Infrastructure.Matches;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -20,6 +22,9 @@ public static class DependencyInjection
         services.AddSingleton<ConfiguredMatchProvider>();
         services.AddSingleton<IMatchProvider>(provider => provider.GetRequiredService<ConfiguredMatchProvider>());
         services.AddSingleton<IMatchProviderHealthReader>(provider => provider.GetRequiredService<ConfiguredMatchProvider>());
+        services.AddSingleton<InMemoryMatchSessionService>();
+        services.AddSingleton<IMatchSessionService>(provider => provider.GetRequiredService<InMemoryMatchSessionService>());
+        services.AddHostedService<MatchSessionWorker>();
         return services;
     }
 }
