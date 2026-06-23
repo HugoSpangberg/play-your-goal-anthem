@@ -6,7 +6,7 @@ GoalAnthem is a football-viewing companion app. The intended flow is intentional
 
 ## Current Project Status
 
-Repository foundation and the fourth thin vertical slice are implemented. The app can load deterministic demo matches, let the user choose a match and team, pick a deterministic demo anthem or a local audio file, set a cue point, start a deterministic match mode, and play the selected anthem when the supported team scores.
+Repository foundation and the fifth thin vertical slice are implemented. The app can load selectable matches, use optional live World Cup match data from football-data.org when configured, fall back to deterministic demo matches without an API key, let the user choose a match and team, pick a deterministic demo anthem or a local audio file, set a cue point, start deterministic match mode, and play the selected anthem when the supported team scores in that local simulation.
 
 Screenshot placeholder: not yet available.
 
@@ -27,6 +27,15 @@ npm run dev --prefix src/GoalAnthem.Web
 
 Open `http://localhost:5173`. The Vite dev server proxies `/api` to `http://localhost:5000`.
 
+Optional live World Cup match data:
+
+```bash
+export FootballData__ApiToken=
+dotnet run --project src/GoalAnthem.Api
+```
+
+Set `FootballData__ApiToken` to a free football-data.org API token locally when you want live World Cup match selection. Leave it empty for deterministic demo data. Never commit a real token.
+
 Docker Compose:
 
 ```bash
@@ -46,19 +55,20 @@ flowchart LR
   Infrastructure --> Application
   Infrastructure --> Domain
   Infrastructure --> DemoData[demo/matches/demo-matches.json]
+  Infrastructure --> FootballData[football-data.org WC API]
 ```
 
 - Domain contains match invariants and explicit types.
-- Application owns the `Get demo matches` use case contract and mapping.
-- Infrastructure reads deterministic JSON demo match data and validates it at the boundary.
-- API is the composition root and exposes `/api/demo-matches`, `/health`, and development Swagger UI.
+- Application owns the provider-neutral `Get matches` use case contract and mapping.
+- Infrastructure reads deterministic JSON demo match data and optionally calls football-data.org when `FootballData__ApiToken` is configured.
+- API is the composition root and exposes `/api/matches`, `/api/demo-matches` as a compatibility route, `/health`, `/health/matches-provider`, and development Swagger UI.
 - Web consumes public HTTP contracts only.
 
 ## Main User Flow
 
 Implemented now:
 
-1. Find match.
+1. Find match from live World Cup data when configured, otherwise demo data.
 2. Choose team.
 3. Choose anthem.
 4. Set cue point.
@@ -70,7 +80,7 @@ Planned:
 
 1. Deterministic second-half scenario refinements.
 2. Optional Spotify Premium integration.
-3. Optional live football data provider integration.
+3. Optional live goal-event provider integration.
 
 ## Technology Choices
 
@@ -80,6 +90,7 @@ Planned:
 - Vitest and Testing Library for frontend behavior tests.
 - GitHub Actions for pull-request validation.
 - Version-controlled demo data so the repository works without API keys.
+- Optional backend-only football-data.org integration for World Cup match selection.
 
 ## Testing Commands
 
@@ -96,11 +107,11 @@ npm run build --prefix src/GoalAnthem.Web
 
 - Deterministic scenario refinements.
 - Optional Spotify Premium integration.
-- Optional live football data provider integration.
+- Optional live goal-event provider integration.
 
 ## Explicit Limitations
 
 - Spotify is not implemented.
-- Live football data is not implemented.
+- Detailed live goal-event detection is not implemented.
 - Authentication is not implemented.
 - No real club names, logos, copyrighted assets, or local audio files are included.

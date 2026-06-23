@@ -5,13 +5,14 @@ GoalAnthem uses a modular monolith backend and a separate React frontend.
 ```mermaid
 flowchart TD
   Browser[Browser] --> Web[GoalAnthem.Web]
-  Web -->|GET /api/demo-matches| Api[GoalAnthem.Api]
+  Web -->|GET /api/matches| Api[GoalAnthem.Api]
   Api --> App[GoalAnthem.Application]
   Api --> Infra[GoalAnthem.Infrastructure]
   App --> Domain[GoalAnthem.Domain]
   Infra --> App
   Infra --> Domain
   Infra --> Data[demo/matches/demo-matches.json]
+  Infra --> FootballData[football-data.org WC API]
 ```
 
 ## Backend Projects
@@ -27,13 +28,16 @@ flowchart TD
 
 ## Current Vertical Slices
 
-`Get demo matches`:
+`Get matches`:
 
 1. `demo/matches/demo-matches.json` stores stable demo match scenarios.
-2. Infrastructure parses and validates JSON into domain objects.
-3. Application maps domain objects into HTTP-safe DTOs.
-4. API exposes `GET /api/demo-matches`.
-5. Web renders loading, empty, and error states for the match list.
+2. Infrastructure parses and validates JSON into domain objects for the zero-configuration fallback.
+3. When `FootballData__ApiToken` is configured, Infrastructure calls football-data.org v4 for competition code `WC` through `IHttpClientFactory`.
+4. Provider DTOs are mapped at the Infrastructure boundary into domain match objects.
+5. The provider uses a short in-memory cache, protects concurrent cache misses, handles upstream rate limits, and falls back to cached or demo data safely.
+6. Application maps domain objects and provider metadata into HTTP-safe DTOs.
+7. API exposes `GET /api/matches` and a legacy `GET /api/demo-matches` compatibility route.
+8. Web renders loading, empty, error, source, freshness, fallback, and manual-refresh states for the match list.
 
 `Match setup`:
 
@@ -51,7 +55,11 @@ flowchart TD
 
 ## Error Handling
 
-The API registers ASP.NET Core Problem Details and uses standard HTTP status codes. The current endpoint has no user input and therefore no request validation errors.
+The API registers ASP.NET Core Problem Details and uses standard HTTP status codes. Provider failures do not expose tokens or provider internals; match selection falls back to cached live data or deterministic demo data where possible.
+
+## Provider Health
+
+`/health` reports application health. `/health/matches-provider` reports whether the optional live match provider is configured and whether the last upstream fetch failed, without exposing the API token.
 
 ## Local Integration
 
