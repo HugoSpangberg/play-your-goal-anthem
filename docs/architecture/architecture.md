@@ -25,7 +25,7 @@ flowchart TD
 
 `GoalAnthem.Web` is a Vite React app. It communicates through HTTP contracts and does not reference backend internals.
 
-## Current Vertical Slice
+## Current Vertical Slices
 
 `Get demo matches`:
 
@@ -33,7 +33,13 @@ flowchart TD
 2. Infrastructure parses and validates JSON into domain objects.
 3. Application maps domain objects into HTTP-safe DTOs.
 4. API exposes `GET /api/demo-matches`.
-5. Web renders loading, empty, error, selectable match states, and a local team-selection step above the match list.
+5. Web renders loading, empty, and error states for the match list.
+
+`Match setup`:
+
+1. Web lets the user select a match and then a supported team.
+2. Web lets the user choose a deterministic demo anthem or a local audio file.
+3. Web lets the user set and validate a cue point, preview audio, and reach a Ready summary.
 
 ## Error Handling
 
