@@ -6,7 +6,7 @@ GoalAnthem is a football-viewing companion app. The intended flow is intentional
 
 ## Current Project Status
 
-Repository foundation and the fifth thin vertical slice are implemented. The app can load selectable matches, use optional live World Cup match data from football-data.org when configured, fall back to deterministic demo matches without an API key, let the user choose a match and team, pick a deterministic demo anthem or a local audio file, set a cue point, start deterministic match mode, and play the selected anthem when the supported team scores in that local simulation.
+Repository foundation and the fifth thin vertical slice are implemented. The app can load selectable matches, use optional World Cup fixture data from football-data.org when configured, fall back to deterministic demo matches without an API key, let the user choose a match and team, pick a deterministic demo anthem or a local audio file, set a cue point, start deterministic match mode, and play the selected anthem when the supported team scores in that local simulation.
 
 Screenshot placeholder: not yet available.
 
@@ -27,14 +27,14 @@ npm run dev --prefix src/GoalAnthem.Web
 
 Open `http://localhost:5173`. The Vite dev server proxies `/api` to `http://localhost:5000`.
 
-Optional live World Cup match data:
+Optional World Cup match data:
 
 ```bash
 export FootballData__ApiToken=
 dotnet run --project src/GoalAnthem.Api
 ```
 
-Set `FootballData__ApiToken` to a free football-data.org API token locally when you want live World Cup match selection. Leave it empty for deterministic demo data. Never commit a real token.
+Set `FootballData__ApiToken` to a free football-data.org API token locally when you want World Cup fixture selection. Leave it empty for deterministic demo data. The free provider plan may return delayed schedule or score updates, so the UI does not present it as real-time goal detection. Never commit a real token.
 
 Docker Compose:
 
@@ -68,7 +68,7 @@ flowchart LR
 
 Implemented now:
 
-1. Find match from live World Cup data when configured, otherwise demo data.
+1. Find a match from World Cup API data when configured, otherwise demo data.
 2. Choose team.
 3. Choose anthem.
 4. Set cue point.
@@ -113,5 +113,6 @@ npm run build --prefix src/GoalAnthem.Web
 
 - Spotify is not implemented.
 - Detailed live goal-event detection is not implemented.
+- football-data.org free-plan data may be delayed and is used for match selection, not precise goal triggering.
 - Authentication is not implemented.
 - No real club names, logos, copyrighted assets, or local audio files are included.
