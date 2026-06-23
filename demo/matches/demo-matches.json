@@ -1,0 +1,43 @@
+{
+  "matches": [
+    {
+      "id": "demo-2026-summer-cup-001",
+      "kickoffTime": "2026-07-04T18:00:00+02:00",
+      "status": "playable",
+      "homeTeam": {
+        "id": "north-harbor-fc",
+        "name": "North Harbor FC"
+      },
+      "awayTeam": {
+        "id": "eastgate-city",
+        "name": "Eastgate City"
+      }
+    },
+    {
+      "id": "demo-2026-summer-cup-002",
+      "kickoffTime": "2026-07-05T20:30:00+02:00",
+      "status": "upcoming",
+      "homeTeam": {
+        "id": "riverside-athletic",
+        "name": "Riverside Athletic"
+      },
+      "awayTeam": {
+        "id": "valley-rovers",
+        "name": "Valley Rovers"
+      }
+    },
+    {
+      "id": "demo-2026-summer-cup-003",
+      "kickoffTime": "2026-07-06T19:45:00+02:00",
+      "status": "upcoming",
+      "homeTeam": {
+        "id": "lakeside-united",
+        "name": "Lakeside United"
+      },
+      "awayTeam": {
+        "id": "hillcrest-fc",
+        "name": "Hillcrest FC"
+      }
+    }
+  ]
+}
