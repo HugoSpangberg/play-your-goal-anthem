@@ -6,7 +6,9 @@ GoalAnthem is a football-viewing companion app. The intended flow is intentional
 
 ## Current Project Status
 
-Repository foundation and the fifth thin vertical slice are implemented. The app can load selectable matches, use optional World Cup fixture data from football-data.org when configured, fall back to deterministic demo matches without an API key, let the user choose a match and team, pick a deterministic demo anthem or a local audio file, set a cue point, start deterministic match mode, and play the selected anthem when the supported team scores in that local simulation.
+Repository foundation and the sixth vertical slice are implemented. The app can load selectable matches, use optional World Cup fixture data from football-data.org when configured, fall back to deterministic demo matches without an API key, let the user choose a match and team, pick a deterministic demo anthem or a local audio file, set a cue point, start a backend-owned deterministic match session, receive match updates over SignalR, and play eligible local/demo audio when the supported team scores.
+
+Spotify can optionally be configured as a browser-only companion integration for account connection, track search, metadata, and setup-time manual playback. Spotify tracks are never used for automatic goal playback.
 
 Screenshot placeholder: not yet available.
 
@@ -25,7 +27,7 @@ dotnet run --project src/GoalAnthem.Api
 npm run dev --prefix src/GoalAnthem.Web
 ```
 
-Open `http://localhost:5173`. The Vite dev server proxies `/api` to `http://localhost:5000`.
+Open `http://localhost:5173`. The Vite dev server proxies `/api` and `/hubs` to `http://localhost:5000`.
 
 Optional World Cup match data:
 
@@ -35,6 +37,16 @@ dotnet run --project src/GoalAnthem.Api
 ```
 
 Set `FootballData__ApiToken` to a free football-data.org API token locally when you want World Cup fixture selection. Leave it empty for deterministic demo data. The free provider plan may return delayed schedule or score updates, so the UI does not present it as real-time goal detection. Never commit a real token.
+
+Optional Spotify companion setup:
+
+```bash
+export VITE_SPOTIFY_CLIENT_ID=
+export VITE_SPOTIFY_REDIRECT_URI=http://localhost:5173
+npm run dev --prefix src/GoalAnthem.Web
+```
+
+Create a Spotify Developer Dashboard app, add the redirect URI, and put only the public Client ID in `VITE_SPOTIFY_CLIENT_ID`. Do not use or commit a client secret. Spotify Web Playback SDK usage requires an eligible Spotify Premium account, and Spotify Development Mode restricts access to authorized users. The app remains fully usable with demo/local audio when Spotify is not configured.
 
 Docker Compose:
 
@@ -48,7 +60,8 @@ GoalAnthem is a modular monolith with a React frontend.
 
 ```mermaid
 flowchart LR
-  Web[GoalAnthem.Web] -->|HTTP| Api[GoalAnthem.Api]
+  Web[GoalAnthem.Web] -->|HTTP + SignalR| Api[GoalAnthem.Api]
+  Web --> Spotify[Spotify Accounts, Web API, Web Playback SDK]
   Api --> Application[GoalAnthem.Application]
   Api --> Infrastructure[GoalAnthem.Infrastructure]
   Application --> Domain[GoalAnthem.Domain]
@@ -60,9 +73,10 @@ flowchart LR
 
 - Domain contains match invariants and explicit types.
 - Application owns the provider-neutral `Get matches` use case contract and mapping.
-- Infrastructure reads deterministic JSON demo match data and optionally calls football-data.org when `FootballData__ApiToken` is configured.
-- API is the composition root and exposes `/api/matches`, `/api/demo-matches` as a compatibility route, `/health`, `/health/matches-provider`, and development Swagger UI.
-- Web consumes public HTTP contracts only.
+- Infrastructure reads deterministic JSON demo match data, optionally calls football-data.org when `FootballData__ApiToken` is configured, and owns in-memory backend match sessions through one centralized hosted worker.
+- API is the composition root and exposes `/api/matches`, `/api/demo-matches` as a compatibility route, `/api/match-sessions`, `/hubs/matches`, `/health`, `/health/matches-provider`, and development Swagger UI.
+- Web consumes public HTTP and SignalR contracts only.
+- Spotify OAuth tokens, authorization codes, PKCE verifiers, local audio files, and browser object URLs stay in the browser.
 
 ## Main User Flow
 
@@ -73,14 +87,16 @@ Implemented now:
 3. Choose anthem.
 4. Set cue point.
 5. Start match.
-6. Play anthem when the supported team scores.
-7. Manually trigger or stop anthem playback.
+6. Receive authoritative match-session updates from the backend.
+7. Play local/demo anthem audio when the supported team scores.
+8. Optionally connect Spotify for companion track search and setup-time manual playback.
+9. Manually trigger or stop eligible local/demo anthem playback.
 
 Planned:
 
-1. Deterministic second-half scenario refinements.
-2. Optional Spotify Premium integration.
-3. Optional live goal-event provider integration.
+1. Persistent multi-device sessions.
+2. Optional live goal-event provider integration.
+3. Production deployment hardening.
 
 ## Technology Choices
 
@@ -91,6 +107,8 @@ Planned:
 - GitHub Actions for pull-request validation.
 - Version-controlled demo data so the repository works without API keys.
 - Optional backend-only football-data.org integration for World Cup match selection.
+- SignalR for backend-owned deterministic match sessions.
+- Optional browser-only Spotify PKCE, Web API search, and setup-time Web Playback SDK controls.
 
 ## Testing Commands
 
@@ -105,14 +123,18 @@ npm run build --prefix src/GoalAnthem.Web
 
 ## Roadmap
 
-- Deterministic scenario refinements.
-- Optional Spotify Premium integration.
+- Persistent match sessions beyond the current in-memory single-process implementation.
 - Optional live goal-event provider integration.
+- Playwright end-to-end smoke coverage.
 
 ## Explicit Limitations
 
-- Spotify is not implemented.
+- Spotify is implemented only as an optional companion/reference integration and setup-time manual player.
+- Spotify must not be controlled by goal events, SignalR messages, match clocks, score changes, kickoff synchronization, or manual goal controls.
 - Detailed live goal-event detection is not implemented.
+- Backend match sessions are in-memory and are lost when the API process restarts.
 - football-data.org free-plan data may be delayed and is used for match selection, not precise goal triggering.
 - Authentication is not implemented.
 - No real club names, logos, copyrighted assets, or local audio files are included.
+- Local audio files never leave the browser.
+- Spotify tokens never reach the backend.
