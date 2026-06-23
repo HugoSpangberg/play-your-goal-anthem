@@ -130,6 +130,25 @@ h2 {
   gap: 16px;
 }
 
+.match-section__heading {
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.match-source {
+  margin: 8px 0 0;
+  color: #4d5c68;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.match-source--fallback {
+  color: #6b4f00;
+  font-weight: 650;
+}
+
 .match-card {
   display: grid;
   min-height: 220px;
@@ -698,6 +717,10 @@ h2 {
   .setup-section,
   .team-section {
     padding: 20px;
+  }
+
+  .match-section__heading {
+    display: grid;
   }
 
   .team-section__header {

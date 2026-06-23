@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
-import { DemoMatch, getDemoMatches } from './demoMatchesApi';
+import { DemoMatch, MatchesResponse, getMatches } from './demoMatchesApi';
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'loaded'; matches: DemoMatch[] }
-  | { status: 'empty' }
+  | { status: 'loaded'; response: MatchesResponse; isRefreshing: boolean }
+  | { status: 'empty'; response: MatchesResponse; isRefreshing: boolean }
   | { status: 'error'; message: string };
 
 type DemoMatchListProps = {
@@ -19,9 +19,9 @@ export function DemoMatchList({ onMatchSelect, selectedMatchId }: DemoMatchListP
   useEffect(() => {
     const abortController = new AbortController();
 
-    getDemoMatches(abortController.signal)
-      .then((matches) => {
-        setState(matches.length === 0 ? { status: 'empty' } : { status: 'loaded', matches });
+    getMatches({ signal: abortController.signal })
+      .then((response) => {
+        setState(response.matches.length === 0 ? { status: 'empty', response, isRefreshing: false } : { status: 'loaded', response, isRefreshing: false });
       })
       .catch((error: unknown) => {
         if (abortController.signal.aborted) {
@@ -30,19 +30,42 @@ export function DemoMatchList({ onMatchSelect, selectedMatchId }: DemoMatchListP
 
         setState({
           status: 'error',
-          message: error instanceof Error ? error.message : 'Demo matches could not be loaded.',
+          message: error instanceof Error ? error.message : 'Matches could not be loaded.',
         });
       });
 
     return () => abortController.abort();
   }, []);
 
+  async function refreshMatches() {
+    if (state.status !== 'loaded' && state.status !== 'empty') {
+      return;
+    }
+
+    setState({ ...state, isRefreshing: true });
+
+    try {
+      const response = await getMatches({ forceRefresh: true });
+      setState(response.matches.length === 0 ? { status: 'empty', response, isRefreshing: false } : { status: 'loaded', response, isRefreshing: false });
+    } catch (error) {
+      setState({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Matches could not be refreshed.',
+      });
+    }
+  }
+
   if (state.status === 'loading') {
-    return <p className="state-message">Loading demo matches...</p>;
+    return <p className="state-message">Loading matches...</p>;
   }
 
   if (state.status === 'empty') {
-    return <p className="state-message">No demo matches are available.</p>;
+    return (
+      <section className="match-section" aria-labelledby="matches-title">
+        <MatchSectionHeader response={state.response} isRefreshing={state.isRefreshing} onRefresh={refreshMatches} />
+        <p className="state-message">No matches are available from this source.</p>
+      </section>
+    );
   }
 
   if (state.status === 'error') {
@@ -55,12 +78,9 @@ export function DemoMatchList({ onMatchSelect, selectedMatchId }: DemoMatchListP
 
   return (
     <section className="match-section" aria-labelledby="matches-title">
-      <div className="section-heading">
-        <p className="step-label">Find match</p>
-        <h2 id="matches-title">Select a demo match</h2>
-      </div>
+      <MatchSectionHeader response={state.response} isRefreshing={state.isRefreshing} onRefresh={refreshMatches} />
       <div className="match-grid">
-        {state.matches.map((match) => {
+        {state.response.matches.map((match) => {
           const isSelected = match.id === selectedMatchId;
 
           return (
@@ -86,6 +106,51 @@ export function DemoMatchList({ onMatchSelect, selectedMatchId }: DemoMatchListP
       </div>
     </section>
   );
+}
+
+function MatchSectionHeader({
+  isRefreshing,
+  onRefresh,
+  response,
+}: {
+  isRefreshing: boolean;
+  onRefresh: () => void;
+  response: MatchesResponse;
+}) {
+  return (
+    <div className="section-heading match-section__heading">
+      <div>
+        <p className="step-label">Find match</p>
+        <h2 id="matches-title">Select a match</h2>
+        <p className="match-source">
+          {formatSource(response.source)}
+          {' · '}
+          Updated <time dateTime={response.fetchedAt}>{formatFreshness(response.fetchedAt)}</time>
+        </p>
+        {response.isFallback || response.message ? (
+          <p className="match-source match-source--fallback" role={response.isFallback ? 'status' : undefined}>
+            {response.message ?? 'Fallback data is currently shown.'}
+          </p>
+        ) : null}
+      </div>
+      <button className="secondary-action" disabled={isRefreshing} onClick={onRefresh} type="button">
+        {isRefreshing ? 'Refreshing...' : 'Refresh matches'}
+      </button>
+    </div>
+  );
+}
+
+function formatSource(source: MatchesResponse['source']) {
+  return source === 'liveWorldCup' ? 'World Cup API data' : 'Demo data';
+}
+
+function formatFreshness(value: string) {
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value));
 }
 
 function formatKickoff(value: string) {

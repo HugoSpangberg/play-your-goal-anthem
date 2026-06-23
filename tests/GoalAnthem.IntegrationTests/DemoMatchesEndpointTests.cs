@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using GoalAnthem.Application.Matches.GetDemoMatches;
+using GoalAnthem.Application.Matches.GetMatches;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace GoalAnthem.IntegrationTests;
@@ -15,7 +15,25 @@ public sealed class DemoMatchesEndpointTests : IClassFixture<WebApplicationFacto
     }
 
     [Fact]
-    public async Task GetDemoMatchesReturnsDeterministicMatches()
+    public async Task GetMatchesReturnsDeterministicFallbackWhenNoTokenIsConfigured()
+    {
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/api/matches", CancellationToken.None);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+        var matches = await response.Content.ReadFromJsonAsync<MatchesResponseDto>(
+            cancellationToken: CancellationToken.None);
+
+        Assert.NotNull(matches);
+        Assert.Equal("demo", matches.Source);
+        Assert.True(matches.IsFallback);
+        Assert.Contains(matches.Matches, match => match.Id == "demo-2026-summer-cup-001");
+    }
+
+    [Fact]
+    public async Task LegacyDemoMatchesRouteReturnsMatchArray()
     {
         using var client = factory.CreateClient();
 
@@ -23,7 +41,7 @@ public sealed class DemoMatchesEndpointTests : IClassFixture<WebApplicationFacto
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        var matches = await response.Content.ReadFromJsonAsync<IReadOnlyList<DemoMatchDto>>(
+        var matches = await response.Content.ReadFromJsonAsync<IReadOnlyList<MatchDto>>(
             cancellationToken: CancellationToken.None);
 
         Assert.NotNull(matches);
@@ -38,5 +56,18 @@ public sealed class DemoMatchesEndpointTests : IClassFixture<WebApplicationFacto
         var response = await client.GetAsync("/health", CancellationToken.None);
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task MatchProviderHealthEndpointDoesNotExposeSecrets()
+    {
+        using var client = factory.CreateClient();
+
+        var response = await client.GetAsync("/health/matches-provider", CancellationToken.None);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync(CancellationToken.None);
+        Assert.DoesNotContain("ApiToken", content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("X-Auth-Token", content, StringComparison.OrdinalIgnoreCase);
     }
 }

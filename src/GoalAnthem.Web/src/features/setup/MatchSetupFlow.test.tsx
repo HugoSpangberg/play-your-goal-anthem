@@ -64,7 +64,7 @@ describe('MatchSetupFlow', () => {
 
     const returnedMatchButton = await screen.findByRole('button', { name: /North Harbor FC/i });
 
-    expect(screen.getByRole('heading', { name: 'Select a demo match' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Select a match' })).toBeInTheDocument();
     expect(returnedMatchButton).toHaveAttribute('aria-pressed', 'true');
     expect(returnedMatchButton).toHaveTextContent('Selected match');
   });
@@ -269,7 +269,13 @@ function stubMatches() {
     'fetch',
     vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => demoMatches,
+      json: async () => ({
+        matches: demoMatches,
+        source: 'demo',
+        fetchedAt: '2026-06-23T12:00:00Z',
+        isFallback: true,
+        message: 'Demo data is shown because live World Cup data is not configured.',
+      }),
     }),
   );
 }

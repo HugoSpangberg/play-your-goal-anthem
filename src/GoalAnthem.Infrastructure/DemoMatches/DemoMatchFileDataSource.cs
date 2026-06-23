@@ -1,5 +1,4 @@
 using System.Text.Json;
-using GoalAnthem.Application.Matches.GetDemoMatches;
 using GoalAnthem.Domain.Matches;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -9,7 +8,6 @@ namespace GoalAnthem.Infrastructure.DemoMatches;
 public sealed class DemoMatchFileDataSource(
     IHostEnvironment environment,
     ILogger<DemoMatchFileDataSource> logger)
-    : IGetDemoMatchesDataSource
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
 
