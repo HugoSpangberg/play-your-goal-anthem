@@ -10,7 +10,7 @@ Find match -> Choose team -> Choose anthem -> Set cue point -> Start match -> Ev
 
 ## Current Scope
 
-The current implementation covers only the first step: loading deterministic demo matches and allowing the user to select one in the web UI.
+The current implementation covers the first two setup steps: loading deterministic demo matches, allowing the user to select one, and then choosing which team they support in that match.
 
 ## Users
 
@@ -23,8 +23,10 @@ The primary audience for the repository is technical recruiters evaluating engin
 - Demo data must be deterministic and version-controlled.
 - Documentation must not claim unimplemented behavior.
 
-## Success Criteria For The First Slice
+## Success Criteria For The Current Slices
 
 - A user can open the web app and see demo matches loaded from the backend.
+- A user can select a match and immediately move into team selection.
+- A user can select either the home or away team and return to the match list if needed.
 - The API exposes documented deterministic match data.
-- Tests cover domain rules, mapping, endpoint behavior, architecture boundaries, and frontend list behavior.
+- Tests cover domain rules, mapping, endpoint behavior, architecture boundaries, and frontend setup behavior.

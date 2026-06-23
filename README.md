@@ -6,7 +6,7 @@ GoalAnthem is a football-viewing companion app. The intended flow is intentional
 
 ## Current Project Status
 
-Repository foundation and the first thin vertical slice are implemented. The app can load deterministic demo matches from version-controlled data through the backend and display them as selectable cards in the frontend.
+Repository foundation and the second thin vertical slice are implemented. The app can load deterministic demo matches from version-controlled data, let the user choose a match, and then choose the team they support for that match.
 
 Screenshot placeholder: not yet available.
 
@@ -59,15 +59,15 @@ flowchart LR
 Implemented now:
 
 1. Find match.
+2. Choose team.
 
 Planned:
 
-1. Choose team.
-2. Choose anthem.
-3. Set cue point.
-4. Start match.
-5. Automatically play anthem when the supported team scores.
-6. Manually trigger anthem if provider data is delayed.
+1. Choose anthem.
+2. Set cue point.
+3. Start match.
+4. Automatically play anthem when the supported team scores.
+5. Manually trigger anthem if provider data is delayed.
 
 ## Technology Choices
 
@@ -91,7 +91,6 @@ npm run build --prefix src/GoalAnthem.Web
 
 ## Roadmap
 
-- Team selection for a selected match.
 - Anthem selection using bundled, license-safe demo options.
 - Cue-point controls and local playback.
 - Match-start synchronization.

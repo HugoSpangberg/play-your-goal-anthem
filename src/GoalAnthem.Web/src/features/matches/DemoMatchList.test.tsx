@@ -18,7 +18,7 @@ describe('DemoMatchList', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders selectable demo match cards', async () => {
+  it('renders selectable demo match cards and calls the explicit selection callback', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -26,8 +26,9 @@ describe('DemoMatchList', () => {
         json: async () => demoMatches,
       }),
     );
+    const onMatchSelect = vi.fn();
 
-    render(<DemoMatchList />);
+    render(<DemoMatchList onMatchSelect={onMatchSelect} />);
 
     expect(screen.getByText('Loading demo matches...')).toBeInTheDocument();
 
@@ -36,7 +37,7 @@ describe('DemoMatchList', () => {
 
     await userEvent.click(match);
 
-    expect(match).toHaveTextContent('Selected');
+    expect(onMatchSelect).toHaveBeenCalledWith(demoMatches[0]);
   });
 
   it('shows an empty state when no matches are returned', async () => {
@@ -48,7 +49,7 @@ describe('DemoMatchList', () => {
       }),
     );
 
-    render(<DemoMatchList />);
+    render(<DemoMatchList onMatchSelect={vi.fn()} />);
 
     expect(await screen.findByText('No demo matches are available.')).toBeInTheDocument();
   });
@@ -62,7 +63,7 @@ describe('DemoMatchList', () => {
       }),
     );
 
-    render(<DemoMatchList />);
+    render(<DemoMatchList onMatchSelect={vi.fn()} />);
 
     await waitFor(() => {
       expect(screen.getByRole('alert')).toHaveTextContent('Status: 500');
