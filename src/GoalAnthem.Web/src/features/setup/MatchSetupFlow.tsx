@@ -1,7 +1,11 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import { demoAnthems } from '../anthems/demoAnthems';
+import { type MatchSessionEvent, type MatchSessionSnapshot } from '../matchSessions/matchSessionsApi';
+import { useRemoteMatchSession } from '../matchSessions/useRemoteMatchSession';
 import { DemoMatchList } from '../matches/DemoMatchList';
 import { type DemoMatch, type Team } from '../matches/demoMatchesApi';
+import { SpotifyCompanion } from '../spotify/SpotifyCompanion';
+import { type SpotifyTrack } from '../spotify/spotifyApi';
 import {
   createBrowserScheduler,
   createInitialMatchSnapshot,
@@ -19,6 +23,7 @@ type SetupDraft = {
   supportedTeam?: Team;
   anthemSelection?: AnthemSelection;
   cuePointInput: string;
+  spotifyTrack?: SpotifyTrack;
 };
 
 type SetupState =
@@ -78,6 +83,7 @@ export function MatchSetupFlow() {
               step: 'anthem',
               draft: {
                 match: state.draft.match,
+                spotifyTrack: state.draft.spotifyTrack,
                 supportedTeam,
                 cuePointInput: formatCuePoint(0),
               },
@@ -98,6 +104,16 @@ export function MatchSetupFlow() {
                 supportedTeam: state.draft.supportedTeam,
                 anthemSelection,
                 cuePointInput: formatCuePoint(0),
+                spotifyTrack: state.draft.spotifyTrack,
+              },
+            })
+          }
+          onSelectSpotifyTrack={(spotifyTrack) =>
+            setState({
+              step: 'anthem',
+              draft: {
+                ...state.draft,
+                spotifyTrack,
               },
             })
           }
@@ -147,6 +163,7 @@ export function MatchSetupFlow() {
                 supportedTeam: state.draft.supportedTeam,
                 anthemSelection: state.draft.anthemSelection,
                 cuePointInput: formatCuePoint(state.draft.cuePointSeconds),
+                spotifyTrack: state.draft.spotifyTrack,
               },
             })
           }
@@ -279,9 +296,11 @@ type AnthemSelectionStepProps = {
   onBackToTeam: () => void;
   // eslint-disable-next-line no-unused-vars
   onSelectAnthem: (anthemSelection: AnthemSelection) => void;
+  // eslint-disable-next-line no-unused-vars
+  onSelectSpotifyTrack: (spotifyTrack: SpotifyTrack) => void;
 };
 
-function AnthemSelectionStep({ draft, onBackToTeam, onSelectAnthem }: AnthemSelectionStepProps) {
+function AnthemSelectionStep({ draft, onBackToTeam, onSelectAnthem, onSelectSpotifyTrack }: AnthemSelectionStepProps) {
   const selectedDemoAnthemId = draft.anthemSelection?.kind === 'demo' ? draft.anthemSelection.anthem.id : undefined;
 
   return (
@@ -355,6 +374,8 @@ function AnthemSelectionStep({ draft, onBackToTeam, onSelectAnthem }: AnthemSele
           Choose one anthem to continue to cue point setup.
         </p>
       )}
+
+      <SpotifyCompanion onSelectTrack={onSelectSpotifyTrack} selectedTrack={draft.spotifyTrack} />
     </section>
   );
 }
@@ -525,6 +546,10 @@ function ReadyStep({ draft, onBackToCuePoint, onStartMatch }: ReadyStepProps) {
           <dd>{describeAnthemSelection(draft.anthemSelection)}</dd>
         </div>
         <div className="ready-summary__row">
+          <dt>Spotify companion track</dt>
+          <dd>{draft.spotifyTrack ? `${draft.spotifyTrack.name} by ${draft.spotifyTrack.artists}` : 'None'}</dd>
+        </div>
+        <div className="ready-summary__row">
           <dt>Cue point</dt>
           <dd>{formatCuePoint(draft.cuePointSeconds)}</dd>
         </div>
@@ -566,6 +591,108 @@ type MatchModeStepProps = {
 };
 
 function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
+  const [mode, setMode] = useState<'remote' | 'local'>('remote');
+  const [retryKey, setRetryKey] = useState(0);
+
+  if (mode === 'local') {
+    return <LocalMatchModeStep draft={draft} onEndMatchMode={onEndMatchMode} speed={speed} />;
+  }
+
+  return (
+    <RemoteMatchModeStep
+      key={retryKey}
+      draft={draft}
+      onBack={onEndMatchMode}
+      onEndMatchMode={onEndMatchMode}
+      onRetry={() => setRetryKey((current) => current + 1)}
+      onUseLocalFallback={() => setMode('local')}
+      speed={speed}
+    />
+  );
+}
+
+type RemoteMatchModeStepProps = {
+  draft: ReadyDraft;
+  onBack: () => void;
+  onEndMatchMode: () => void;
+  onRetry: () => void;
+  onUseLocalFallback: () => void;
+  speed: MatchSpeed;
+};
+
+function RemoteMatchModeStep({ draft, onBack, onEndMatchMode, onRetry, onUseLocalFallback, speed }: RemoteMatchModeStepProps) {
+  const { match, supportedTeam, anthemSelection, cuePointSeconds } = draft;
+  const { audioRef, playFromCue, preview, stopPreview } = useAnthemPreview(anthemSelection);
+  const [lastAnthemStatus, setLastAnthemStatus] = useState('Waiting for a supported-team goal.');
+  const onNewSupportedTeamGoal = useCallback(
+    (event: MatchSessionEvent) => {
+      setLastAnthemStatus(`Playing anthem for ${event.label}.`);
+      void playFromCue(cuePointSeconds);
+    },
+    [cuePointSeconds, playFromCue],
+  );
+  const { endSession, error, snapshot, status } = useRemoteMatchSession({
+    match,
+    onNewSupportedTeamGoal,
+    speed,
+    supportedTeamId: supportedTeam.id,
+  });
+
+  if (status === 'unavailable') {
+    return (
+      <section className="match-mode" aria-labelledby="match-mode-title">
+        <div className="section-heading setup-section__header">
+          <div className="setup-section__copy">
+            <p className="step-label">Remote match mode</p>
+            <h3 id="match-mode-title">Remote match mode is unavailable</h3>
+            <p className="setup-section__summary">{error ?? 'The backend match session could not be started.'}</p>
+          </div>
+        </div>
+        <div className="match-controls">
+          <button className="primary-action" onClick={onRetry} type="button">
+            Try again
+          </button>
+          <button className="secondary-action" onClick={onUseLocalFallback} type="button">
+            Use local demo mode
+          </button>
+          <button className="secondary-action" onClick={onBack} type="button">
+            Back
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <MatchModeView
+      audioRef={audioRef}
+      connectionStatus={status}
+      lastAnthemStatus={lastAnthemStatus}
+      match={match}
+      onEndMatchMode={() => {
+        void endSession().finally(() => {
+          stopPreview();
+          onEndMatchMode();
+        });
+      }}
+      onManualPlayback={() => {
+        setLastAnthemStatus('Manual goal playback started.');
+        void playFromCue(cuePointSeconds);
+      }}
+      onStopPlayback={() => {
+        stopPreview();
+        setLastAnthemStatus('Anthem stopped.');
+      }}
+      previewUrl={preview?.audioUrl}
+      snapshot={snapshot}
+      speed={speed}
+      supportedTeamName={supportedTeam.name}
+      spotifyTrack={draft.spotifyTrack}
+    />
+  );
+}
+
+function LocalMatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
   const { match, supportedTeam, anthemSelection, cuePointSeconds } = draft;
   const { audioRef, playFromCue, preview, stopPreview } = useAnthemPreview(anthemSelection);
   const [snapshot, setSnapshot] = useState<MatchSnapshot>(() => createInitialMatchSnapshot());
@@ -605,6 +732,66 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
   }, [cuePointSeconds, match, playFromCue, speed, stopPreview, supportedTeam.id]);
 
   return (
+    <MatchModeView
+      audioRef={audioRef}
+      connectionStatus="connected"
+      lastAnthemStatus={lastAnthemStatus}
+      match={match}
+      onEndMatchMode={() => {
+        engineRef.current?.stop();
+        stopPreview();
+        onEndMatchMode();
+      }}
+      onManualPlayback={() => {
+        setLastAnthemStatus('Manual goal playback started.');
+        void playFromCue(cuePointSeconds);
+      }}
+      onStopPlayback={() => {
+        stopPreview();
+        setLastAnthemStatus('Anthem stopped.');
+      }}
+      previewUrl={preview?.audioUrl}
+      snapshot={snapshot}
+      speed={speed}
+      supportedTeamName={supportedTeam.name}
+      spotifyTrack={draft.spotifyTrack}
+      syncStatus={lastSyncStatus}
+    />
+  );
+}
+
+function MatchModeView({
+  audioRef,
+  connectionStatus,
+  lastAnthemStatus,
+  match,
+  onEndMatchMode,
+  onManualPlayback,
+  onStopPlayback,
+  previewUrl,
+  snapshot,
+  speed,
+  spotifyTrack,
+  supportedTeamName,
+  syncStatus,
+}: {
+  audioRef: RefObject<HTMLAudioElement | null>;
+  connectionStatus: string;
+  lastAnthemStatus: string;
+  match: DemoMatch;
+  onEndMatchMode: () => void;
+  onManualPlayback: () => void;
+  onStopPlayback: () => void;
+  previewUrl?: string;
+  snapshot: MatchSnapshot | MatchSessionSnapshot | null;
+  speed: MatchSpeed;
+  spotifyTrack?: SpotifyTrack;
+  supportedTeamName: string;
+  syncStatus?: string;
+}) {
+  const currentSnapshot = snapshot ?? createInitialMatchSnapshot();
+
+  return (
     <section className="match-mode" aria-labelledby="match-mode-title">
       <div className="section-heading setup-section__header">
         <div className="setup-section__copy">
@@ -614,41 +801,33 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
             {match.homeTeam.name} vs {match.awayTeam.name}
           </p>
         </div>
-        <button
-          className="secondary-action"
-          onClick={() => {
-            engineRef.current?.stop();
-            stopPreview();
-            onEndMatchMode();
-          }}
-          type="button"
-        >
+        <button className="secondary-action" onClick={onEndMatchMode} type="button">
           End match mode
         </button>
       </div>
 
-      <audio aria-label="Match anthem playback" preload="metadata" ref={audioRef} src={preview?.audioUrl ?? undefined} />
+      <audio aria-label="Match anthem playback" preload="metadata" ref={audioRef} src={previewUrl} />
 
       <div className="scoreboard" aria-live="polite">
         <div className="scoreboard__team">
           <span>{match.homeTeam.name}</span>
-          <strong>{snapshot.homeScore}</strong>
+          <strong>{currentSnapshot.homeScore}</strong>
         </div>
         <div className="scoreboard__clock">
           <span>Clock</span>
-          <strong>{formatMatchClock(snapshot.elapsedSeconds)}</strong>
-          <span>{formatMatchStatus(snapshot.status)}</span>
+          <strong>{formatMatchClock(currentSnapshot.elapsedSeconds)}</strong>
+          <span>{formatMatchStatus(currentSnapshot.status)}</span>
         </div>
         <div className="scoreboard__team">
           <span>{match.awayTeam.name}</span>
-          <strong>{snapshot.awayScore}</strong>
+          <strong>{currentSnapshot.awayScore}</strong>
         </div>
       </div>
 
       <dl className="match-status-grid">
         <div>
           <dt>Supported team</dt>
-          <dd>{supportedTeam.name}</dd>
+          <dd>{supportedTeamName}</dd>
         </div>
         <div>
           <dt>Anthem status</dt>
@@ -656,42 +835,40 @@ function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
         </div>
         <div>
           <dt>Sync status</dt>
-          <dd>{lastSyncStatus}</dd>
+          <dd>{syncStatus ?? formatConnectionStatus(connectionStatus)}</dd>
         </div>
         <div>
           <dt>Speed</dt>
           <dd>{speed === 'demo' ? 'Demo speed (15x)' : 'Normal speed (1x)'}</dd>
         </div>
+        <div>
+          <dt>Spotify companion</dt>
+          <dd>
+            {spotifyTrack ? (
+              <a href={spotifyTrack.externalUrl} rel="noreferrer" target="_blank">
+                {spotifyTrack.name} by {spotifyTrack.artists}
+              </a>
+            ) : (
+              'None'
+            )}
+          </dd>
+        </div>
       </dl>
 
       <div className="match-controls">
-        <button
-          className="primary-action primary-action--large"
-          onClick={() => {
-            setLastAnthemStatus('Manual goal playback started.');
-            void playFromCue(cuePointSeconds);
-          }}
-          type="button"
-        >
+        <button className="primary-action primary-action--large" onClick={onManualPlayback} type="button">
           Goal! Play anthem now
         </button>
-        <button
-          className="secondary-action"
-          onClick={() => {
-            stopPreview();
-            setLastAnthemStatus('Anthem stopped.');
-          }}
-          type="button"
-        >
+        <button className="secondary-action" onClick={onStopPlayback} type="button">
           Stop anthem
         </button>
       </div>
 
       <section aria-labelledby="timeline-title" className="timeline-panel">
         <h4 id="timeline-title">Match timeline</h4>
-        {snapshot.timeline.length > 0 ? (
+        {currentSnapshot.timeline.length > 0 ? (
           <ol>
-            {snapshot.timeline.map((event) => (
+            {currentSnapshot.timeline.map((event) => (
               <li key={event.id}>
                 <span>{formatMatchClock(event.atSecond)}</span>
                 <span>{event.label}</span>
@@ -723,5 +900,24 @@ function formatMatchStatus(status: MatchSnapshot['status']) {
       return 'Live';
     default:
       return 'Waiting';
+  }
+}
+
+function formatConnectionStatus(status: string) {
+  switch (status) {
+    case 'starting':
+      return 'Starting backend match session.';
+    case 'connecting':
+      return 'Connecting to match stream.';
+    case 'connected':
+      return 'Connected to backend match stream.';
+    case 'reconnecting':
+      return 'Reconnecting to match stream.';
+    case 'disconnected':
+      return 'Disconnected from match stream.';
+    case 'ended':
+      return 'Match session ended.';
+    default:
+      return 'Match stream unavailable.';
   }
 }

@@ -151,7 +151,7 @@ describe('MatchSetupFlow', () => {
     await completeDemoSetup(user, 'North Harbor FC');
 
     vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
+    await startLocalFallbackMatchMode();
 
     expect(screen.getByRole('heading', { name: 'Match mode' })).toBeInTheDocument();
     expect(screen.getByText('Kickoff')).toBeInTheDocument();
@@ -175,7 +175,7 @@ describe('MatchSetupFlow', () => {
 
     await completeDemoSetup(user, 'Eastgate City');
     vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
+    await startLocalFallbackMatchMode();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(56_000);
@@ -197,7 +197,7 @@ describe('MatchSetupFlow', () => {
     await completeDemoSetup(user, 'North Harbor FC');
     await user.click(screen.getByLabelText('Normal speed (1x)'));
     vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
+    await startLocalFallbackMatchMode();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(60_000);
@@ -219,7 +219,7 @@ describe('MatchSetupFlow', () => {
     await completeDemoSetup(user, 'North Harbor FC');
     vi.useFakeTimers();
     const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
-    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
+    await startLocalFallbackMatchMode();
     fireEvent.click(screen.getByRole('button', { name: 'End match mode' }));
 
     expect(screen.getByRole('heading', { name: 'Your setup is ready' })).toBeInTheDocument();
@@ -236,7 +236,7 @@ describe('MatchSetupFlow', () => {
     vi.useFakeTimers();
     const setIntervalSpy = vi.spyOn(window, 'setInterval');
     const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
-    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
+    await startLocalFallbackMatchMode();
 
     expect(setIntervalSpy).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(1);
@@ -267,15 +267,26 @@ describe('MatchSetupFlow', () => {
 function stubMatches() {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        matches: demoMatches,
-        source: 'demo',
-        fetchedAt: '2026-06-23T12:00:00Z',
-        isFallback: true,
-        message: 'Demo data is shown because live World Cup data is not configured.',
-      }),
+    vi.fn(async (input: unknown) => {
+      const url = String(input);
+      if (url.includes('/api/match-sessions')) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({ title: 'Match sessions unavailable' }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          matches: demoMatches,
+          source: 'demo',
+          fetchedAt: '2026-06-23T12:00:00Z',
+          isFallback: true,
+          message: 'Demo data is shown because live World Cup data is not configured.',
+        }),
+      };
     }),
   );
 }
@@ -303,4 +314,17 @@ async function completeDemoSetup(user: ReturnType<typeof userEvent.setup>, teamN
   await user.click(screen.getByRole('button', { name: new RegExp(teamName, 'i') }));
   await user.click(screen.getByRole('button', { name: /Stadium Pulse/i }));
   await user.click(screen.getByRole('button', { name: 'Mark ready' }));
+}
+
+async function startLocalFallbackMatchMode() {
+  fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
+
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(screen.getByRole('heading', { name: 'Remote match mode is unavailable' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Use local demo mode' }));
 }
