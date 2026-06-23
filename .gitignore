@@ -4,6 +4,8 @@ TestResults/
 coverage/
 .vs/
 .vscode/
+.codex/
+**/AGENTS.md
 *.user
 *.suo
 

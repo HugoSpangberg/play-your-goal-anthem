@@ -33,7 +33,7 @@ flowchart TD
 2. Infrastructure parses and validates JSON into domain objects.
 3. Application maps domain objects into HTTP-safe DTOs.
 4. API exposes `GET /api/demo-matches`.
-5. Web renders loading, empty, error, and selectable loaded states.
+5. Web renders loading, empty, error, selectable match states, and a local team-selection step above the match list.
 
 ## Error Handling
 
