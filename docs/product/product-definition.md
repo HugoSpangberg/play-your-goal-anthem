@@ -10,7 +10,7 @@ Find match -> Choose team -> Choose anthem -> Set cue point -> Start match -> Ev
 
 ## Current Scope
 
-The current implementation covers the first two setup steps: loading deterministic demo matches, allowing the user to select one, and then choosing which team they support in that match.
+The current implementation covers the first five setup steps: loading deterministic demo matches, allowing the user to select a match and team, choosing a deterministic demo anthem or a local audio file, setting a cue point, previewing playback, and reaching a Ready summary.
 
 ## Users
 
@@ -27,6 +27,8 @@ The primary audience for the repository is technical recruiters evaluating engin
 
 - A user can open the web app and see demo matches loaded from the backend.
 - A user can select a match and immediately move into team selection.
-- A user can select either the home or away team and return to the match list if needed.
+- A user can select either the home or away team and continue to anthem selection.
+- A user can choose a deterministic demo anthem or a local audio file.
+- A user can set and validate a cue point, preview playback, and reach the Ready summary.
 - The API exposes documented deterministic match data.
 - Tests cover domain rules, mapping, endpoint behavior, architecture boundaries, and frontend setup behavior.

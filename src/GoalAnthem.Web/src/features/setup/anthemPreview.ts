@@ -1,0 +1,112 @@
+import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { createDemoAnthemBlob, DemoAnthem } from '../anthems/demoAnthems';
+
+export type AnthemSelection =
+  | { kind: 'demo'; anthem: DemoAnthem }
+  | { kind: 'local'; file: File };
+
+type PreviewState = {
+  audioUrl: string;
+  label: string;
+  durationSeconds: number | null;
+  sourceLabel: string;
+};
+
+export function useAnthemPreview(selection: AnthemSelection | undefined) {
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const [preview, setPreview] = useState<PreviewState | null>(null);
+
+  useEffect(() => {
+    const audio = audioRef.current;
+
+    if (audio) {
+      audio.pause();
+      audio.currentTime = 0;
+    }
+
+    if (!selection) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPreview(null);
+      return undefined;
+    }
+
+    const source =
+      selection.kind === 'demo'
+        ? {
+            audioUrl: URL.createObjectURL(createDemoAnthemBlob(selection.anthem)),
+            label: selection.anthem.name,
+            durationSeconds: selection.anthem.durationSeconds,
+            sourceLabel: 'Deterministic demo anthem',
+          }
+        : {
+            audioUrl: URL.createObjectURL(selection.file),
+            label: selection.file.name,
+            durationSeconds: null,
+            sourceLabel: 'Local audio file',
+          };
+
+    setPreview(source);
+
+    return () => {
+      if (audio) {
+        audio.pause();
+        audio.currentTime = 0;
+      }
+
+      URL.revokeObjectURL(source.audioUrl);
+    };
+  }, [selection]);
+
+  const durationSeconds = preview?.durationSeconds ?? null;
+
+  function handleLoadedMetadata(event: SyntheticEvent<HTMLAudioElement>) {
+    const audio = event.currentTarget;
+
+    if (Number.isFinite(audio.duration)) {
+      setPreview((current) =>
+        current
+          ? {
+              ...current,
+              durationSeconds: Math.max(0, Math.floor(audio.duration)),
+            }
+          : current,
+      );
+    }
+  }
+
+  async function playFromCue(cuePointSeconds: number) {
+    const audio = audioRef.current;
+
+    if (!audio) {
+      return;
+    }
+
+    audio.currentTime = cuePointSeconds;
+
+    try {
+      await audio.play();
+    } catch {
+      // Browsers can reject autoplay. The UI already exposes the error-free preview control.
+    }
+  }
+
+  function stopPreview() {
+    const audio = audioRef.current;
+
+    if (!audio) {
+      return;
+    }
+
+    audio.pause();
+    audio.currentTime = 0;
+  }
+
+  return {
+    audioRef,
+    durationSeconds,
+    handleLoadedMetadata,
+    playFromCue,
+    preview,
+    stopPreview,
+  };
+}
