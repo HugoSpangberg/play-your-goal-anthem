@@ -33,7 +33,7 @@ public sealed class ConfiguredMatchProvider(
 
         if (string.IsNullOrWhiteSpace(token))
         {
-            return await GetDemoFallbackAsync("Demo data is shown because live World Cup data is not configured.", cancellationToken);
+            return await GetDemoFallbackAsync("Demo data is shown because World Cup API data is not configured.", cancellationToken);
         }
 
         if (!request.ForceRefresh && TryGetFreshCache(now, out var cached))
@@ -75,12 +75,12 @@ public sealed class ConfiguredMatchProvider(
             catch (FootballDataRateLimitException exception)
             {
                 logger.LogWarning(exception, "football-data.org rate limit was reached while loading World Cup matches.");
-                return await HandleProviderFailureAsync(now, "Live World Cup data is temporarily rate-limited.", cancellationToken);
+                return await HandleProviderFailureAsync(now, "World Cup API data is temporarily rate-limited.", cancellationToken);
             }
             catch (Exception exception) when (exception is HttpRequestException or JsonException or InvalidOperationException)
             {
-                logger.LogWarning(exception, "Live World Cup match provider failed. Falling back safely.");
-                return await HandleProviderFailureAsync(now, "Live World Cup data is temporarily unavailable.", cancellationToken);
+                logger.LogWarning(exception, "World Cup match provider failed. Falling back safely.");
+                return await HandleProviderFailureAsync(now, "World Cup API data is temporarily unavailable.", cancellationToken);
             }
         }
         finally
@@ -143,9 +143,7 @@ public sealed class ConfiguredMatchProvider(
 
     private async Task<IReadOnlyList<DemoMatch>> FetchWorldCupMatchesAsync(string token, CancellationToken cancellationToken)
     {
-        using var request = new HttpRequestMessage(
-            HttpMethod.Get,
-            "v4/competitions/WC/matches?status=SCHEDULED,TIMED,IN_PLAY,PAUSED");
+        using var request = new HttpRequestMessage(HttpMethod.Get, "v4/competitions/WC/matches");
         request.Headers.Add("X-Auth-Token", token);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
