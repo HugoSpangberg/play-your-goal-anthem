@@ -18,7 +18,7 @@ const demoResponse = {
   source: 'demo',
   fetchedAt: '2026-06-23T12:00:00Z',
   isFallback: true,
-  message: 'Demo data is shown because live World Cup data is not configured.',
+  message: 'Demo data is shown because World Cup API data is not configured.',
 };
 
 describe('DemoMatchList', () => {
@@ -43,14 +43,14 @@ describe('DemoMatchList', () => {
     const match = await screen.findByRole('button', { name: /North Harbor FC/i });
     expect(match).toHaveTextContent('Eastgate City');
     expect(screen.getAllByText(/Demo data/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/live World Cup data is not configured/i)).toBeInTheDocument();
+    expect(screen.getByText(/World Cup API data is not configured/i)).toBeInTheDocument();
 
     await userEvent.click(match);
 
     expect(onMatchSelect).toHaveBeenCalledWith(demoMatches[0]);
   });
 
-  it('renders live World Cup source metadata', async () => {
+  it('renders World Cup API source metadata without claiming real-time data', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn().mockResolvedValue({
@@ -66,7 +66,8 @@ describe('DemoMatchList', () => {
 
     render(<DemoMatchList onMatchSelect={vi.fn()} />);
 
-    expect(await screen.findByText(/Live World Cup data/i)).toBeInTheDocument();
+    expect(await screen.findByText(/World Cup API data/i)).toBeInTheDocument();
+    expect(screen.queryByText(/Live World Cup data/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Fallback data/i)).not.toBeInTheDocument();
   });
 
