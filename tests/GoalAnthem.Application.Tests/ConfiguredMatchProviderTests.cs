@@ -47,6 +47,13 @@ public sealed class ConfiguredMatchProviderTests
                   "awayTeam": { "id": 14, "name": "Japan" }
                 },
                 {
+                  "id": 1003,
+                  "utcDate": "2026-06-10T21:00:00Z",
+                  "status": "FINISHED",
+                  "homeTeam": { "id": 16, "name": "Spain" },
+                  "awayTeam": { "id": 17, "name": "France" }
+                },
+                {
                   "id": null,
                   "utcDate": "not-a-date",
                   "status": "SCHEDULED",
@@ -77,7 +84,8 @@ public sealed class ConfiguredMatchProviderTests
                 Assert.Equal(GoalAnthem.Domain.Matches.MatchStatus.Live, second.Status);
             });
         Assert.Equal("free-token", http.Requests.Single().Headers.GetValues("X-Auth-Token").Single());
-        Assert.Contains("/v4/competitions/WC/matches", http.Requests.Single().RequestUri?.PathAndQuery, StringComparison.Ordinal);
+        Assert.Equal("/v4/competitions/WC/matches", http.Requests.Single().RequestUri?.PathAndQuery);
+        Assert.DoesNotContain("status=", http.Requests.Single().RequestUri?.PathAndQuery, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
