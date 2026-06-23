@@ -1,7 +1,16 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { demoAnthems } from '../anthems/demoAnthems';
 import { DemoMatchList } from '../matches/DemoMatchList';
 import { type DemoMatch, type Team } from '../matches/demoMatchesApi';
+import {
+  createBrowserScheduler,
+  createInitialMatchSnapshot,
+  formatMatchClock,
+  getDemoMatchEvents,
+  MatchSimulationEngine,
+  type MatchSnapshot,
+  type MatchSpeed,
+} from '../matchMode/matchSimulation';
 import { parseCuePointInput, formatCuePoint } from './cuePoint';
 import { type AnthemSelection, useAnthemPreview } from './anthemPreview';
 
@@ -24,9 +33,20 @@ type SetupState =
         anthemSelection: AnthemSelection;
         cuePointSeconds: number;
       };
+    }
+  | {
+      step: 'match-mode';
+      speed: MatchSpeed;
+      draft: SetupDraft & {
+        supportedTeam: Team;
+        anthemSelection: AnthemSelection;
+        cuePointSeconds: number;
+      };
     };
 
-const setupSteps = ['Match', 'Team', 'Anthem', 'Cue point', 'Ready'] as const;
+type ReadyDraft = Extract<SetupState, { step: 'ready' }>['draft'];
+
+const setupSteps = ['Match', 'Team', 'Anthem', 'Cue point', 'Ready', 'Match mode'] as const;
 
 export function MatchSetupFlow() {
   const [state, setState] = useState<SetupState>({ step: 'match' });
@@ -112,6 +132,13 @@ export function MatchSetupFlow() {
       {state.step === 'ready' ? (
         <ReadyStep
           draft={state.draft}
+          onStartMatch={(speed) =>
+            setState({
+              step: 'match-mode',
+              draft: state.draft,
+              speed,
+            })
+          }
           onBackToCuePoint={() =>
             setState({
               step: 'cue',
@@ -121,6 +148,19 @@ export function MatchSetupFlow() {
                 anthemSelection: state.draft.anthemSelection,
                 cuePointInput: formatCuePoint(state.draft.cuePointSeconds),
               },
+            })
+          }
+        />
+      ) : null}
+
+      {state.step === 'match-mode' ? (
+        <MatchModeStep
+          draft={state.draft}
+          speed={state.speed}
+          onEndMatchMode={() =>
+            setState({
+              step: 'ready',
+              draft: state.draft,
             })
           }
         />
@@ -139,6 +179,7 @@ const stepIndexByState: Record<SetupState['step'], number> = {
   anthem: 2,
   cue: 3,
   ready: 4,
+  'match-mode': 5,
 };
 
 function ProgressIndicator({ state }: ProgressIndicatorProps) {
@@ -446,11 +487,15 @@ function CuePointStep({ draft, onBackToAnthems, onCuePointInputChange, onReady }
 }
 
 type ReadyStepProps = {
-  draft: SetupDraft & { supportedTeam: Team; anthemSelection: AnthemSelection; cuePointSeconds: number };
+  draft: ReadyDraft;
   onBackToCuePoint: () => void;
+  // eslint-disable-next-line no-unused-vars
+  onStartMatch: (speed: MatchSpeed) => void;
 };
 
-function ReadyStep({ draft, onBackToCuePoint }: ReadyStepProps) {
+function ReadyStep({ draft, onBackToCuePoint, onStartMatch }: ReadyStepProps) {
+  const [speed, setSpeed] = useState<MatchSpeed>('demo');
+
   return (
     <section className="setup-section setup-section--ready" aria-labelledby="ready-title">
       <div className="section-heading setup-section__header">
@@ -484,10 +529,199 @@ function ReadyStep({ draft, onBackToCuePoint }: ReadyStepProps) {
           <dd>{formatCuePoint(draft.cuePointSeconds)}</dd>
         </div>
       </dl>
+
+      <fieldset className="speed-options">
+        <legend>Match speed</legend>
+        <label>
+          <input
+            checked={speed === 'demo'}
+            name="match-speed"
+            onChange={() => setSpeed('demo')}
+            type="radio"
+          />
+          Demo speed (15x)
+        </label>
+        <label>
+          <input
+            checked={speed === 'normal'}
+            name="match-speed"
+            onChange={() => setSpeed('normal')}
+            type="radio"
+          />
+          Normal speed (1x)
+        </label>
+      </fieldset>
+
+      <button className="primary-action primary-action--large" onClick={() => onStartMatch(speed)} type="button">
+        Start match
+      </button>
+    </section>
+  );
+}
+
+type MatchModeStepProps = {
+  draft: ReadyDraft;
+  onEndMatchMode: () => void;
+  speed: MatchSpeed;
+};
+
+function MatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps) {
+  const { match, supportedTeam, anthemSelection, cuePointSeconds } = draft;
+  const { audioRef, playFromCue, preview, stopPreview } = useAnthemPreview(anthemSelection);
+  const [snapshot, setSnapshot] = useState<MatchSnapshot>(() => createInitialMatchSnapshot());
+  const [lastAnthemStatus, setLastAnthemStatus] = useState('Waiting for a supported-team goal.');
+  const [lastSyncStatus, setLastSyncStatus] = useState('Kickoff synchronized from Start match.');
+  const engineRef = useRef<MatchSimulationEngine | null>(null);
+
+  useEffect(() => {
+    const engine = new MatchSimulationEngine({
+      events: getDemoMatchEvents(match),
+      match,
+      scheduler: createBrowserScheduler(),
+      speed,
+      supportedTeamId: supportedTeam.id,
+      onGoalForSupportedTeam: (event) => {
+        setLastAnthemStatus(`Playing anthem for ${event.label}.`);
+        void playFromCue(cuePointSeconds);
+      },
+      onSnapshot: (nextSnapshot) => {
+        setSnapshot(nextSnapshot);
+        setLastSyncStatus(
+          nextSnapshot.status === 'ended'
+            ? 'Full-time reached in the deterministic match.'
+            : `Synchronized at ${formatMatchClock(nextSnapshot.elapsedSeconds)} from local kickoff.`,
+        );
+      },
+    });
+
+    engineRef.current = engine;
+    engine.start();
+
+    return () => {
+      engine.stop();
+      engineRef.current = null;
+      stopPreview();
+    };
+  }, [cuePointSeconds, match, playFromCue, speed, stopPreview, supportedTeam.id]);
+
+  return (
+    <section className="match-mode" aria-labelledby="match-mode-title">
+      <div className="section-heading setup-section__header">
+        <div className="setup-section__copy">
+          <p className="step-label">Live match mode</p>
+          <h3 id="match-mode-title">Match mode</h3>
+          <p className="setup-section__summary">
+            {match.homeTeam.name} vs {match.awayTeam.name}
+          </p>
+        </div>
+        <button
+          className="secondary-action"
+          onClick={() => {
+            engineRef.current?.stop();
+            stopPreview();
+            onEndMatchMode();
+          }}
+          type="button"
+        >
+          End match mode
+        </button>
+      </div>
+
+      <audio aria-label="Match anthem playback" preload="metadata" ref={audioRef} src={preview?.audioUrl ?? undefined} />
+
+      <div className="scoreboard" aria-live="polite">
+        <div className="scoreboard__team">
+          <span>{match.homeTeam.name}</span>
+          <strong>{snapshot.homeScore}</strong>
+        </div>
+        <div className="scoreboard__clock">
+          <span>Clock</span>
+          <strong>{formatMatchClock(snapshot.elapsedSeconds)}</strong>
+          <span>{formatMatchStatus(snapshot.status)}</span>
+        </div>
+        <div className="scoreboard__team">
+          <span>{match.awayTeam.name}</span>
+          <strong>{snapshot.awayScore}</strong>
+        </div>
+      </div>
+
+      <dl className="match-status-grid">
+        <div>
+          <dt>Supported team</dt>
+          <dd>{supportedTeam.name}</dd>
+        </div>
+        <div>
+          <dt>Anthem status</dt>
+          <dd>{lastAnthemStatus}</dd>
+        </div>
+        <div>
+          <dt>Sync status</dt>
+          <dd>{lastSyncStatus}</dd>
+        </div>
+        <div>
+          <dt>Speed</dt>
+          <dd>{speed === 'demo' ? 'Demo speed (15x)' : 'Normal speed (1x)'}</dd>
+        </div>
+      </dl>
+
+      <div className="match-controls">
+        <button
+          className="primary-action primary-action--large"
+          onClick={() => {
+            setLastAnthemStatus('Manual goal playback started.');
+            void playFromCue(cuePointSeconds);
+          }}
+          type="button"
+        >
+          Goal! Play anthem now
+        </button>
+        <button
+          className="secondary-action"
+          onClick={() => {
+            stopPreview();
+            setLastAnthemStatus('Anthem stopped.');
+          }}
+          type="button"
+        >
+          Stop anthem
+        </button>
+      </div>
+
+      <section aria-labelledby="timeline-title" className="timeline-panel">
+        <h4 id="timeline-title">Match timeline</h4>
+        {snapshot.timeline.length > 0 ? (
+          <ol>
+            {snapshot.timeline.map((event) => (
+              <li key={event.id}>
+                <span>{formatMatchClock(event.atSecond)}</span>
+                <span>{event.label}</span>
+                <strong>
+                  {event.homeScore}-{event.awayScore}
+                </strong>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <p>No match events processed yet.</p>
+        )}
+      </section>
     </section>
   );
 }
 
 function describeAnthemSelection(selection: AnthemSelection) {
   return selection.kind === 'demo' ? selection.anthem.name : `Local file: ${selection.file.name}`;
+}
+
+function formatMatchStatus(status: MatchSnapshot['status']) {
+  switch (status) {
+    case 'half-time':
+      return 'Half-time';
+    case 'ended':
+      return 'Full-time';
+    case 'live':
+      return 'Live';
+    default:
+      return 'Waiting';
+  }
 }

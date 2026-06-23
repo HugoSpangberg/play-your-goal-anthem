@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type SyntheticEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { createDemoAnthemBlob, DemoAnthem } from '../anthems/demoAnthems';
 
 export type AnthemSelection =
@@ -74,7 +74,7 @@ export function useAnthemPreview(selection: AnthemSelection | undefined) {
     }
   }
 
-  async function playFromCue(cuePointSeconds: number) {
+  const playFromCue = useCallback(async (cuePointSeconds: number) => {
     const audio = audioRef.current;
 
     if (!audio) {
@@ -88,9 +88,9 @@ export function useAnthemPreview(selection: AnthemSelection | undefined) {
     } catch {
       // Browsers can reject autoplay. The UI already exposes the error-free preview control.
     }
-  }
+  }, []);
 
-  function stopPreview() {
+  const stopPreview = useCallback(() => {
     const audio = audioRef.current;
 
     if (!audio) {
@@ -99,7 +99,7 @@ export function useAnthemPreview(selection: AnthemSelection | undefined) {
 
     audio.pause();
     audio.currentTime = 0;
-  }
+  }, []);
 
   return {
     audioRef,

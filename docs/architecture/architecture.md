@@ -41,6 +41,14 @@ flowchart TD
 2. Web lets the user choose a deterministic demo anthem or a local audio file.
 3. Web lets the user set and validate a cue point, preview audio, and reach a Ready summary.
 
+`Match mode`:
+
+1. Web treats `Start match` as the local TV kickoff synchronization point.
+2. A frontend match simulation engine processes deterministic event scenarios through a small scheduler boundary.
+3. Stable event IDs prevent duplicate goal processing.
+4. Supported-team goals trigger browser-local anthem playback from the configured cue point.
+5. Manual playback, stop playback, and end-match controls remain local to the browser session.
+
 ## Error Handling
 
 The API registers ASP.NET Core Problem Details and uses standard HTTP status codes. The current endpoint has no user input and therefore no request validation errors.
