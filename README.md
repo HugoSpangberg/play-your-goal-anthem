@@ -6,7 +6,7 @@ GoalAnthem is a football-viewing companion app. The intended flow is intentional
 
 ## Current Project Status
 
-Repository foundation and the sixth vertical slice are implemented. The app can load selectable matches, use optional World Cup fixture data from football-data.org when configured, fall back to deterministic demo matches without an API key, let the user choose a match and team, pick a deterministic demo anthem or import a local audio file, set a cue point, start a backend-owned deterministic match session, receive match updates over SignalR, and play eligible demo/local audio when the supported team scores.
+Repository foundation and the sixth vertical slice are implemented. The app can load selectable matches, use optional World Cup fixture data from football-data.org when configured, fall back to deterministic demo matches without an API key, let the user choose a match and team, import a local audio file, set a cue point, start a backend-owned deterministic match session, receive match updates over SignalR, and play the imported local audio when the supported team scores.
 
 For royalty-free music discovery, the app links to the official Pixabay Music site. The user downloads music directly from Pixabay, returns to GoalAnthem, and imports the downloaded file as normal local browser audio.
 
@@ -50,7 +50,7 @@ Optional royalty-free music workflow:
 4. Import the downloaded audio file in GoalAnthem.
 5. Optionally save source metadata such as title, creator, source URL, download date, and Content ID notes.
 
-GoalAnthem does not use a Pixabay API, connect a Pixabay account, download tracks, scrape pages, or verify licenses. Imported files and source metadata remain in the browser and are not uploaded, sent to the backend, or committed. Keep source/download records when possible. Some tracks may be registered with Content ID. Deterministic demo audio remains available without downloading anything.
+GoalAnthem does not use a Pixabay API, connect a Pixabay account, download tracks, scrape pages, or verify licenses. Imported files and source metadata remain in the browser and are not uploaded, sent to the backend, or committed. Keep source/download records when possible. Some tracks may be registered with Content ID.
 
 Docker Compose:
 
@@ -91,13 +91,13 @@ Implemented now:
 
 1. Find a match from World Cup API data when configured, otherwise demo data.
 2. Choose team.
-3. Choose demo anthem or import a local audio file.
+3. Import a local audio file.
 4. Set cue point.
-5. Start match.
+5. Press start when kickoff is visible on the TV or stream.
 6. Receive authoritative match-session updates from the backend.
-7. Play local/demo anthem audio when the supported team scores.
+7. Play the imported local anthem audio when the supported team scores.
 8. Optionally record local source metadata for files downloaded separately from sites such as Pixabay.
-9. Manually trigger or stop eligible local/demo anthem playback.
+9. Manually trigger or stop local anthem playback.
 
 Planned:
 
@@ -116,6 +116,7 @@ Planned:
 - Optional backend-only football-data.org integration for World Cup match selection.
 - SignalR for backend-owned deterministic match sessions.
 - Browser-local audio import with optional source metadata.
+- Country flags are derived locally from provider-neutral ISO alpha-2 country codes; no external flag service is used.
 
 ## Testing Commands
 
@@ -138,6 +139,7 @@ npm run build --prefix src/GoalAnthem.Web
 
 - There is no music API integration, streaming-service control, or account flow.
 - GoalAnthem links to Pixabay Music for manual discovery only; it does not download, scrape, embed, or verify Pixabay tracks.
+- Automatic anthem playback requires a user-imported local audio file.
 - Detailed live goal-event detection is not implemented.
 - Backend match sessions are in-memory and are lost when the API process restarts.
 - football-data.org free-plan data may be delayed and is used for match selection, not precise goal triggering.

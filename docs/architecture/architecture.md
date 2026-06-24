@@ -45,11 +45,12 @@ flowchart TD
 `Match setup`:
 
 1. Web lets the user select a match and then a supported team.
-2. Web lets the user choose a deterministic demo anthem or a local audio file.
+2. Web requires the user to import a local audio file for automatic anthem playback.
 3. Web links to the official Pixabay Music site for manual discovery, but it does not call a Pixabay API, scrape pages, embed Pixabay, or download tracks.
 4. A downloaded Pixabay track is handled as a normal browser-local file after the user imports it.
 5. Optional source metadata is stored only in React state for the current browser session and is never sent to backend HTTP or SignalR contracts.
 6. Web lets the user set and validate a cue point, preview audio, and reach a Ready summary.
+7. Web tells the user to press Start when kickoff is visible on the TV or stream, which accounts for broadcast delay.
 
 `Match mode`:
 
@@ -60,9 +61,17 @@ flowchart TD
 5. Demo speed advances 15 match seconds per real second. Normal speed advances one match second per real second.
 6. Delayed worker ticks process every crossed deterministic event exactly once and in chronological order.
 7. API streams session snapshots, processed events, and ended notifications through the typed SignalR hub at `/hubs/matches`.
-8. Web receives authoritative snapshots and events, deduplicates handled event IDs per active session, and only triggers eligible browser-local demo/local audio for newly observed supported-team goals.
+8. Web receives authoritative snapshots and events, deduplicates handled event IDs per active session, and only triggers the browser-local imported audio file for newly observed supported-team goals.
 9. Web exposes explicit local demo fallback. Remote and local simulation modes never run at the same time.
 10. Manual playback, stop playback, and browser audio cleanup remain local to the browser session.
+
+`Country identity`:
+
+1. Application DTOs expose optional provider-neutral ISO alpha-2 country codes for teams.
+2. Demo data stores stable country codes in version-controlled JSON.
+3. football-data.org team identifiers are mapped centrally in Infrastructure from known football TLAs and controlled team-name aliases.
+4. Web renders country flags locally from those country codes as Unicode emoji with a neutral fallback.
+5. No external flag image service is used at runtime.
 
 ## Error Handling
 

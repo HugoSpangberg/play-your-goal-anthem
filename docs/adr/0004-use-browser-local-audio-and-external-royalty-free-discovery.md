@@ -14,7 +14,7 @@ Pixabay Music can help users discover royalty-free music, but Pixabay does not p
 
 Use browser-local audio as the automatic-playback boundary.
 
-Supported automatic anthem sources are deterministic demo audio and user-imported local audio files. A user may open the official Pixabay Music website in a separate tab, download a track directly from Pixabay, return to GoalAnthem, and import that downloaded file through the browser file picker.
+The supported automatic anthem source is a user-imported local audio file. A user may open the official Pixabay Music website in a separate tab, download a track directly from Pixabay, return to GoalAnthem, and import that downloaded file through the browser file picker.
 
 GoalAnthem may store optional source metadata in React state for the current browser session, such as title, creator, source URL, download date, and Content ID notes. This metadata is a user-maintained source record, not license verification.
 
@@ -23,6 +23,7 @@ GoalAnthem does not implement a Pixabay API client, backend proxy, scraper, embe
 ## Consequences
 
 - The main demo remains free and works without music APIs, accounts, secrets, or paid services.
+- Generated demo songs are not part of the production setup flow; deterministic demo match data remains available.
 - Local files and source metadata stay in the browser and are not sent to backend match-session APIs or SignalR.
 - Imported audio can work offline after selection and is not dependent on a streaming provider during match mode.
 - Users remain responsible for checking current track and license information and keeping source/download records.
