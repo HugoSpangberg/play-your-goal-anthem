@@ -6,9 +6,9 @@ GoalAnthem is a football-viewing companion app. The intended flow is intentional
 
 ## Current Project Status
 
-Repository foundation and the sixth vertical slice are implemented. The app can load selectable matches, use optional World Cup fixture data from football-data.org when configured, fall back to deterministic demo matches without an API key, let the user choose a match and team, pick a deterministic demo anthem or a local audio file, set a cue point, start a backend-owned deterministic match session, receive match updates over SignalR, and play eligible local/demo audio when the supported team scores.
+Repository foundation and the sixth vertical slice are implemented. The app can load selectable matches, use optional World Cup fixture data from football-data.org when configured, fall back to deterministic demo matches without an API key, let the user choose a match and team, pick a deterministic demo anthem or import a local audio file, set a cue point, start a backend-owned deterministic match session, receive match updates over SignalR, and play eligible demo/local audio when the supported team scores.
 
-Spotify can optionally be configured as a browser-only companion integration for account connection, track search, metadata, and setup-time manual playback. Spotify tracks are never used for automatic goal playback.
+For royalty-free music discovery, the app links to the official Pixabay Music site. The user downloads music directly from Pixabay, returns to GoalAnthem, and imports the downloaded file as normal local browser audio.
 
 Screenshot placeholder: not yet available.
 
@@ -42,35 +42,15 @@ dotnet user-secrets list --project src/GoalAnthem.Api
 
 The API project has a committed non-secret `UserSecretsId`; the actual token is stored outside the repository. Restart the API after changing the token. Leave it unset for deterministic demo data. The free provider plan may return delayed schedule or score updates, so the UI does not present it as real-time goal detection. Never commit a real token.
 
-Optional Spotify companion setup:
+Optional royalty-free music workflow:
 
-1. Create or open an app in the Spotify Developer Dashboard.
-2. Add this exact Redirect URI to the app settings:
+1. Open Pixabay Music from the anthem-selection screen.
+2. Review the track and current license information on Pixabay.
+3. Download directly from Pixabay.
+4. Import the downloaded audio file in GoalAnthem.
+5. Optionally save source metadata such as title, creator, source URL, download date, and Content ID notes.
 
-```text
-http://127.0.0.1:5173
-```
-
-Spotify requires an explicit loopback IP for local HTTP development; `localhost` is not accepted. The redirect URI must match exactly.
-
-3. Create the ignored frontend environment file:
-
-```bash
-cat > src/GoalAnthem.Web/.env.local <<'EOF'
-VITE_SPOTIFY_CLIENT_ID=YOUR_PUBLIC_SPOTIFY_CLIENT_ID
-VITE_SPOTIFY_REDIRECT_URI=http://127.0.0.1:5173
-EOF
-```
-
-4. Restart the Vite development server and open the same loopback URL:
-
-```bash
-npm run dev --prefix src/GoalAnthem.Web
-```
-
-Open `http://127.0.0.1:5173`, not `http://localhost:5173`.
-
-Use only the public Spotify Client ID. Do not use or commit a client secret. Spotify Web Playback SDK usage requires an eligible Spotify Premium account, and Spotify Development Mode restricts access to authorized users. The app remains fully usable with demo/local audio when Spotify is not configured.
+GoalAnthem does not use a Pixabay API, connect a Pixabay account, download tracks, scrape pages, or verify licenses. Imported files and source metadata remain in the browser and are not uploaded, sent to the backend, or committed. Keep source/download records when possible. Some tracks may be registered with Content ID. Deterministic demo audio remains available without downloading anything.
 
 Docker Compose:
 
@@ -85,7 +65,9 @@ GoalAnthem is a modular monolith with a React frontend.
 ```mermaid
 flowchart LR
   Web[GoalAnthem.Web] -->|HTTP + SignalR| Api[GoalAnthem.Api]
-  Web --> Spotify[Spotify Accounts, Web API, Web Playback SDK]
+  User[User] -->|opens separate tab| Pixabay[Pixabay Music website]
+  Pixabay -->|manual download| LocalFile[Local audio file]
+  LocalFile --> Web
   Api --> Application[GoalAnthem.Application]
   Api --> Infrastructure[GoalAnthem.Infrastructure]
   Application --> Domain[GoalAnthem.Domain]
@@ -100,7 +82,8 @@ flowchart LR
 - Infrastructure reads deterministic JSON demo match data, optionally calls football-data.org when `FootballData__ApiToken` is configured, and owns in-memory backend match sessions through one centralized hosted worker.
 - API is the composition root and exposes `/api/matches`, `/api/demo-matches` as a compatibility route, `/api/match-sessions`, `/hubs/matches`, `/health`, `/health/matches-provider`, and development Swagger UI.
 - Web consumes public HTTP and SignalR contracts only.
-- Spotify OAuth tokens, authorization codes, PKCE verifiers, local audio files, and browser object URLs stay in the browser.
+- Local audio files, source metadata, and browser object URLs stay in the browser.
+- Pixabay is an external discovery website, not an API dependency.
 
 ## Main User Flow
 
@@ -108,12 +91,12 @@ Implemented now:
 
 1. Find a match from World Cup API data when configured, otherwise demo data.
 2. Choose team.
-3. Choose anthem.
+3. Choose demo anthem or import a local audio file.
 4. Set cue point.
 5. Start match.
 6. Receive authoritative match-session updates from the backend.
 7. Play local/demo anthem audio when the supported team scores.
-8. Optionally connect Spotify for companion track search and setup-time manual playback.
+8. Optionally record local source metadata for files downloaded separately from sites such as Pixabay.
 9. Manually trigger or stop eligible local/demo anthem playback.
 
 Planned:
@@ -132,7 +115,7 @@ Planned:
 - Version-controlled demo data so the repository works without API keys.
 - Optional backend-only football-data.org integration for World Cup match selection.
 - SignalR for backend-owned deterministic match sessions.
-- Optional browser-only Spotify PKCE, Web API search, and setup-time Web Playback SDK controls.
+- Browser-local audio import with optional source metadata.
 
 ## Testing Commands
 
@@ -153,12 +136,11 @@ npm run build --prefix src/GoalAnthem.Web
 
 ## Explicit Limitations
 
-- Spotify is implemented only as an optional companion/reference integration and setup-time manual player.
-- Spotify must not be controlled by goal events, SignalR messages, match clocks, score changes, kickoff synchronization, or manual goal controls.
+- There is no music API integration, streaming-service control, or account flow.
+- GoalAnthem links to Pixabay Music for manual discovery only; it does not download, scrape, embed, or verify Pixabay tracks.
 - Detailed live goal-event detection is not implemented.
 - Backend match sessions are in-memory and are lost when the API process restarts.
 - football-data.org free-plan data may be delayed and is used for match selection, not precise goal triggering.
 - Authentication is not implemented.
 - No real club names, logos, copyrighted assets, or local audio files are included.
 - Local audio files never leave the browser.
-- Spotify tokens never reach the backend.
