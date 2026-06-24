@@ -1,11 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { demoAnthems } from '../anthems/demoAnthems';
+import { PixabayMusicGuide } from '../anthems/PixabayMusicGuide';
+import {
+  getSafePixabaySourceUrl,
+  getSourceTypeLabel,
+  validateLocalAudioFile,
+  validatePixabayMusicUrl,
+  type LocalAudioSourceMetadata,
+} from '../anthems/localAudioSource';
 import { type MatchSessionEvent, type MatchSessionSnapshot } from '../matchSessions/matchSessionsApi';
 import { useRemoteMatchSession } from '../matchSessions/useRemoteMatchSession';
 import { DemoMatchList } from '../matches/DemoMatchList';
 import { type DemoMatch, type Team } from '../matches/demoMatchesApi';
-import { SpotifyCompanion } from '../spotify/SpotifyCompanion';
-import { type SpotifyTrack } from '../spotify/spotifyApi';
 import {
   createBrowserScheduler,
   createInitialMatchSnapshot,
@@ -23,7 +29,6 @@ type SetupDraft = {
   supportedTeam?: Team;
   anthemSelection?: AnthemSelection;
   cuePointInput: string;
-  spotifyTrack?: SpotifyTrack;
 };
 
 type SetupState =
@@ -83,7 +88,6 @@ export function MatchSetupFlow() {
               step: 'anthem',
               draft: {
                 match: state.draft.match,
-                spotifyTrack: state.draft.spotifyTrack,
                 supportedTeam,
                 cuePointInput: formatCuePoint(0),
               },
@@ -104,19 +108,51 @@ export function MatchSetupFlow() {
                 supportedTeam: state.draft.supportedTeam,
                 anthemSelection,
                 cuePointInput: formatCuePoint(0),
-                spotifyTrack: state.draft.spotifyTrack,
               },
             })
           }
-          onSelectSpotifyTrack={(spotifyTrack) =>
+          onSelectLocalFile={(anthemSelection) =>
             setState({
               step: 'anthem',
               draft: {
                 ...state.draft,
-                spotifyTrack,
+                anthemSelection,
               },
             })
           }
+          onUpdateLocalSource={(source) => {
+            const selection = state.draft.anthemSelection;
+            if (selection?.kind !== 'local') {
+              return;
+            }
+
+            setState({
+              step: 'anthem',
+              draft: {
+                ...state.draft,
+                anthemSelection: {
+                  ...selection,
+                  source,
+                },
+              },
+            });
+          }}
+          onContinueWithLocalFile={() => {
+            const selection = state.draft.anthemSelection;
+            if (selection?.kind !== 'local') {
+              return;
+            }
+
+            setState({
+              step: 'cue',
+              draft: {
+                match: state.draft.match,
+                supportedTeam: state.draft.supportedTeam,
+                anthemSelection: selection,
+                cuePointInput: formatCuePoint(0),
+              },
+            });
+          }}
         />
       ) : null}
 
@@ -163,7 +199,6 @@ export function MatchSetupFlow() {
                 supportedTeam: state.draft.supportedTeam,
                 anthemSelection: state.draft.anthemSelection,
                 cuePointInput: formatCuePoint(state.draft.cuePointSeconds),
-                spotifyTrack: state.draft.spotifyTrack,
               },
             })
           }
@@ -297,11 +332,26 @@ type AnthemSelectionStepProps = {
   // eslint-disable-next-line no-unused-vars
   onSelectAnthem: (anthemSelection: AnthemSelection) => void;
   // eslint-disable-next-line no-unused-vars
-  onSelectSpotifyTrack: (spotifyTrack: SpotifyTrack) => void;
+  onSelectLocalFile: (anthemSelection: Extract<AnthemSelection, { kind: 'local' }>) => void;
+  onContinueWithLocalFile: () => void;
+  // eslint-disable-next-line no-unused-vars
+  onUpdateLocalSource: (source: LocalAudioSourceMetadata) => void;
 };
 
-function AnthemSelectionStep({ draft, onBackToTeam, onSelectAnthem, onSelectSpotifyTrack }: AnthemSelectionStepProps) {
+function AnthemSelectionStep({
+  draft,
+  onBackToTeam,
+  onContinueWithLocalFile,
+  onSelectAnthem,
+  onSelectLocalFile,
+  onUpdateLocalSource,
+}: AnthemSelectionStepProps) {
   const selectedDemoAnthemId = draft.anthemSelection?.kind === 'demo' ? draft.anthemSelection.anthem.id : undefined;
+  const localSelection = draft.anthemSelection?.kind === 'local' ? draft.anthemSelection : null;
+  const localSource = localSelection?.source ?? { sourceType: 'local' as const };
+  const [fileError, setFileError] = useState<string | null>(null);
+  const sourceUrlValidation =
+    localSource.sourceType === 'pixabay' && localSource.sourceUrl ? validatePixabayMusicUrl(localSource.sourceUrl) : null;
 
   return (
     <section className="setup-section" aria-labelledby="anthem-selection-title">
@@ -335,11 +385,15 @@ function AnthemSelectionStep({ draft, onBackToTeam, onSelectAnthem, onSelectSpot
         ))}
       </div>
 
+      <PixabayMusicGuide />
+
       <div className="local-audio-card">
         <div className="local-audio-card__copy">
           <p className="step-label">Local file</p>
           <p className="local-audio-card__title">Use an audio file from your device</p>
-          <p className="local-audio-card__note">The file stays in your browser and is never uploaded.</p>
+          <p className="local-audio-card__note">
+            Imported audio, source notes, and object URLs stay in this browser and are never uploaded.
+          </p>
         </div>
 
         <label className="file-picker">
@@ -349,14 +403,117 @@ function AnthemSelectionStep({ draft, onBackToTeam, onSelectAnthem, onSelectSpot
             aria-label="Choose a local audio file"
             onChange={(event) => {
               const file = event.currentTarget.files?.[0];
+              const validationError = validateLocalAudioFile(file);
+              setFileError(validationError);
 
-              if (file) {
-                onSelectAnthem({ kind: 'local', file });
+              if (file && validationError === null) {
+                onSelectLocalFile({ kind: 'local', file, source: { sourceType: 'local' } });
               }
             }}
             type="file"
           />
         </label>
+
+        {fileError ? (
+          <p className="cue-panel__error" role="alert">
+            {fileError}
+          </p>
+        ) : null}
+
+        {localSelection ? (
+          <div className="source-metadata">
+            <fieldset className="source-type-options">
+              <legend>Where did this local file come from?</legend>
+              <label>
+                <input
+                  checked={localSource.sourceType === 'local'}
+                  name="local-audio-source-type"
+                  onChange={() => onUpdateLocalSource({ sourceType: 'local' })}
+                  type="radio"
+                />
+                Local audio file
+              </label>
+              <label>
+                <input
+                  checked={localSource.sourceType === 'pixabay'}
+                  name="local-audio-source-type"
+                  onChange={() => onUpdateLocalSource({ ...localSource, sourceType: 'pixabay' })}
+                  type="radio"
+                />
+                Downloaded from Pixabay
+              </label>
+            </fieldset>
+
+            {localSource.sourceType === 'pixabay' ? (
+              <details className="metadata-fields" open>
+                <summary>Optional Pixabay source record</summary>
+                <p className="local-audio-card__note">
+                  These notes help you keep your own source record. They are not legal verification and are not sent to the backend.
+                </p>
+                <label>
+                  <span>Track title</span>
+                  <input
+                    onChange={(event) => onUpdateLocalSource(cleanSourceMetadata({ ...localSource, title: event.currentTarget.value }))}
+                    type="text"
+                    value={localSource.title ?? ''}
+                  />
+                </label>
+                <label>
+                  <span>Creator or contributor</span>
+                  <input
+                    onChange={(event) => onUpdateLocalSource(cleanSourceMetadata({ ...localSource, creator: event.currentTarget.value }))}
+                    type="text"
+                    value={localSource.creator ?? ''}
+                  />
+                </label>
+                <label>
+                  <span>Original Pixabay music-page URL</span>
+                  <input
+                    aria-describedby="pixabay-source-url-message"
+                    onChange={(event) =>
+                      onUpdateLocalSource(cleanSourceMetadata({ ...localSource, sourceUrl: event.currentTarget.value }))
+                    }
+                    type="url"
+                    value={localSource.sourceUrl ?? ''}
+                  />
+                </label>
+                {sourceUrlValidation && !sourceUrlValidation.isValid ? (
+                  <p className="cue-panel__error" id="pixabay-source-url-message" role="alert">
+                    {sourceUrlValidation.message} You can still continue with the local file.
+                  </p>
+                ) : (
+                  <p className="cue-panel__error cue-panel__error--quiet" id="pixabay-source-url-message">
+                    Use the original Pixabay music page when you have it.
+                  </p>
+                )}
+                <label>
+                  <span>Download date</span>
+                  <input
+                    onChange={(event) =>
+                      onUpdateLocalSource(cleanSourceMetadata({ ...localSource, downloadedOn: event.currentTarget.value }))
+                    }
+                    type="date"
+                    value={localSource.downloadedOn ?? ''}
+                  />
+                </label>
+                <label>
+                  <span>License, certificate, or Content ID note</span>
+                  <textarea
+                    onChange={(event) =>
+                      onUpdateLocalSource(cleanSourceMetadata({ ...localSource, licenseNote: event.currentTarget.value }))
+                    }
+                    rows={3}
+                    value={localSource.licenseNote ?? ''}
+                  />
+                </label>
+              </details>
+            ) : null}
+
+            <button className="primary-action" onClick={onContinueWithLocalFile} type="button">
+              Continue to cue point
+            </button>
+          </div>
+        ) : null}
       </div>
 
       {draft.anthemSelection?.kind === 'local' ? (
@@ -374,8 +531,6 @@ function AnthemSelectionStep({ draft, onBackToTeam, onSelectAnthem, onSelectSpot
           Choose one anthem to continue to cue point setup.
         </p>
       )}
-
-      <SpotifyCompanion onSelectTrack={onSelectSpotifyTrack} selectedTrack={draft.spotifyTrack} />
     </section>
   );
 }
@@ -542,13 +697,15 @@ function ReadyStep({ draft, onBackToCuePoint, onStartMatch }: ReadyStepProps) {
           <dd>{draft.supportedTeam.name}</dd>
         </div>
         <div className="ready-summary__row">
-          <dt>Anthem</dt>
+          <dt>Automatic goal anthem</dt>
           <dd>{describeAnthemSelection(draft.anthemSelection)}</dd>
         </div>
-        <div className="ready-summary__row">
-          <dt>Spotify companion track</dt>
-          <dd>{draft.spotifyTrack ? `${draft.spotifyTrack.name} by ${draft.spotifyTrack.artists}` : 'None'}</dd>
-        </div>
+        {getAnthemSourceSummary(draft.anthemSelection).map((item) => (
+          <div className="ready-summary__row" key={item.label}>
+            <dt>{item.label}</dt>
+            <dd>{item.value}</dd>
+          </div>
+        ))}
         <div className="ready-summary__row">
           <dt>Cue point</dt>
           <dd>{formatCuePoint(draft.cuePointSeconds)}</dd>
@@ -686,8 +843,8 @@ function RemoteMatchModeStep({ draft, onBack, onEndMatchMode, onRetry, onUseLoca
       previewUrl={preview?.audioUrl}
       snapshot={snapshot}
       speed={speed}
+      anthemSelection={anthemSelection}
       supportedTeamName={supportedTeam.name}
-      spotifyTrack={draft.spotifyTrack}
     />
   );
 }
@@ -753,8 +910,8 @@ function LocalMatchModeStep({ draft, onEndMatchMode, speed }: MatchModeStepProps
       previewUrl={preview?.audioUrl}
       snapshot={snapshot}
       speed={speed}
+      anthemSelection={anthemSelection}
       supportedTeamName={supportedTeam.name}
-      spotifyTrack={draft.spotifyTrack}
       syncStatus={lastSyncStatus}
     />
   );
@@ -771,10 +928,11 @@ function MatchModeView({
   previewUrl,
   snapshot,
   speed,
-  spotifyTrack,
+  anthemSelection,
   supportedTeamName,
   syncStatus,
 }: {
+  anthemSelection: AnthemSelection;
   audioRef: RefObject<HTMLAudioElement | null>;
   connectionStatus: string;
   lastAnthemStatus: string;
@@ -785,7 +943,6 @@ function MatchModeView({
   previewUrl?: string;
   snapshot: MatchSnapshot | MatchSessionSnapshot | null;
   speed: MatchSpeed;
-  spotifyTrack?: SpotifyTrack;
   supportedTeamName: string;
   syncStatus?: string;
 }) {
@@ -842,16 +999,8 @@ function MatchModeView({
           <dd>{speed === 'demo' ? 'Demo speed (15x)' : 'Normal speed (1x)'}</dd>
         </div>
         <div>
-          <dt>Spotify companion</dt>
-          <dd>
-            {spotifyTrack ? (
-              <a href={spotifyTrack.externalUrl} rel="noreferrer" target="_blank">
-                {spotifyTrack.name} by {spotifyTrack.artists}
-              </a>
-            ) : (
-              'None'
-            )}
-          </dd>
+          <dt>Anthem source</dt>
+          <dd>{describeMatchModeSource(anthemSelection)}</dd>
         </div>
       </dl>
 
@@ -888,6 +1037,83 @@ function MatchModeView({
 
 function describeAnthemSelection(selection: AnthemSelection) {
   return selection.kind === 'demo' ? selection.anthem.name : `Local file: ${selection.file.name}`;
+}
+
+function getAnthemSourceSummary(selection: AnthemSelection) {
+  if (selection.kind === 'demo') {
+    return [{ label: 'Source', value: 'Deterministic demo anthem' }];
+  }
+
+  const source = selection.source ?? { sourceType: 'local' as const };
+  const summary: Array<{ label: string; value: ReactNode }> = [{ label: 'Source', value: getSourceTypeLabel(source.sourceType) }];
+
+  if (source.sourceType !== 'pixabay') {
+    return summary;
+  }
+
+  if (source.title) {
+    summary.push({ label: 'Track title', value: source.title });
+  }
+
+  if (source.creator) {
+    summary.push({ label: 'Creator', value: source.creator });
+  }
+
+  const sourceUrl = getSafePixabaySourceUrl(source);
+  if (sourceUrl) {
+    summary.push({
+      label: 'Source link',
+      value: (
+        <a href={sourceUrl} rel="noreferrer noopener" target="_blank">
+          Open Pixabay source page <span className="visually-hidden">(opens in a new tab)</span>
+        </a>
+      ),
+    });
+  } else if (source.sourceUrl) {
+    summary.push({ label: 'Source link', value: 'Invalid Pixabay URL not shown' });
+  }
+
+  if (source.downloadedOn) {
+    summary.push({ label: 'Downloaded on', value: source.downloadedOn });
+  }
+
+  if (source.licenseNote) {
+    summary.push({ label: 'Source note', value: source.licenseNote });
+  }
+
+  return summary;
+}
+
+function describeMatchModeSource(selection: AnthemSelection) {
+  if (selection.kind === 'demo') {
+    return selection.anthem.name;
+  }
+
+  const source = selection.source ?? { sourceType: 'local' as const };
+  const parts = [selection.file.name, getSourceTypeLabel(source.sourceType)];
+
+  if (source.title) {
+    parts.push(source.title);
+  }
+
+  if (source.creator) {
+    parts.push(source.creator);
+  }
+
+  return parts.join(' · ');
+}
+
+function cleanSourceMetadata(source: LocalAudioSourceMetadata): LocalAudioSourceMetadata {
+  const cleaned = {
+    sourceType: source.sourceType,
+    title: source.title === '' ? undefined : source.title,
+    creator: source.creator === '' ? undefined : source.creator,
+    sourceUrl: source.sourceUrl?.trim() || undefined,
+    downloadedOn: source.downloadedOn || undefined,
+    licenseNote: source.licenseNote === '' ? undefined : source.licenseNote,
+  };
+
+  return cleaned;
 }
 
 function formatMatchStatus(status: MatchSnapshot['status']) {

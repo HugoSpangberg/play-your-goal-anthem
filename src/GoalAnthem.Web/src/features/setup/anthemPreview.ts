@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
 import { createDemoAnthemBlob, DemoAnthem } from '../anthems/demoAnthems';
+import { getSourceTypeLabel, type LocalAudioSourceMetadata } from '../anthems/localAudioSource';
 
 export type AnthemSelection =
   | { kind: 'demo'; anthem: DemoAnthem }
-  | { kind: 'local'; file: File };
+  | { kind: 'local'; file: File; source?: LocalAudioSourceMetadata };
 
 type PreviewState = {
   audioUrl: string;
@@ -42,7 +43,7 @@ export function useAnthemPreview(selection: AnthemSelection | undefined) {
             audioUrl: URL.createObjectURL(selection.file),
             label: selection.file.name,
             durationSeconds: null,
-            sourceLabel: 'Local audio file',
+            sourceLabel: getSourceTypeLabel(selection.source?.sourceType ?? 'local'),
           };
 
     setPreview(source);

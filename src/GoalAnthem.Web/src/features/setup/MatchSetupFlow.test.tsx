@@ -97,6 +97,7 @@ describe('MatchSetupFlow', () => {
     const localFile = new File(['local anthem'], 'supporter-anthem.mp3', { type: 'audio/mpeg' });
 
     await userEvent.upload(fileInput, localFile);
+    await userEvent.click(screen.getByRole('button', { name: 'Continue to cue point' }));
 
     const audio = await screen.findByLabelText('Preview selected anthem');
     setAudioMetadata(audio as HTMLAudioElement, { currentTime: 27, duration: 125 });
@@ -123,10 +124,101 @@ describe('MatchSetupFlow', () => {
     expect(screen.getByText('North Harbor FC vs Eastgate City')).toBeInTheDocument();
     expect(screen.getByText('Supported team', { selector: 'dt' })).toBeInTheDocument();
     expect(screen.getByText('North Harbor FC')).toBeInTheDocument();
-    expect(screen.getByText('Anthem', { selector: 'dt' })).toBeInTheDocument();
+    expect(screen.getByText('Automatic goal anthem', { selector: 'dt' })).toBeInTheDocument();
     expect(screen.getByText('Local file: supporter-anthem.mp3')).toBeInTheDocument();
+    expect(screen.getByText('Source', { selector: 'dt' })).toBeInTheDocument();
+    expect(screen.getByText('Local file', { selector: 'dd' })).toBeInTheDocument();
     expect(screen.getByText('Cue point', { selector: 'dt' })).toBeInTheDocument();
     expect(screen.getByText('01:15')).toBeInTheDocument();
+  });
+
+  it('shows the Pixabay guide and stores optional source metadata for an imported local file', async () => {
+    const user = userEvent.setup();
+
+    render(<MatchSetupFlow />);
+
+    await user.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
+    await user.click(screen.getByRole('button', { name: /North Harbor FC/i }));
+
+    expect(screen.getByRole('heading', { name: 'Find royalty-free music' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Browse Pixabay Music/i })).toHaveAttribute('href', 'https://pixabay.com/music/');
+    expect(screen.getByRole('link', { name: /Browse Pixabay Music/i })).toHaveAttribute('target', '_blank');
+    expect(screen.getByRole('link', { name: /Browse Pixabay Music/i })).toHaveAttribute('rel', 'noreferrer noopener');
+    expect(screen.getByRole('link', { name: /Read Pixabay Content License/i })).toHaveAttribute(
+      'href',
+      'https://pixabay.com/service/license-summary/',
+    );
+
+    const localFile = new File(['local anthem'], 'pixabay-anthem.wav', { type: 'audio/wav' });
+    await user.upload(screen.getByLabelText('Choose a local audio file'), localFile);
+
+    expect(screen.getByLabelText('Local audio file')).toBeChecked();
+    await user.click(screen.getByLabelText('Downloaded from Pixabay'));
+    await user.type(screen.getByLabelText('Track title'), 'Victory Crowd');
+    await user.type(screen.getByLabelText('Creator or contributor'), 'Demo Creator');
+    await user.type(screen.getByLabelText('Original Pixabay music-page URL'), ' https://pixabay.com/music/example-track-12345/ ');
+    await user.type(screen.getByLabelText('Download date'), '2026-06-24');
+    await user.type(screen.getByLabelText('License, certificate, or Content ID note'), 'Saved source page for review.');
+    await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
+    await user.click(screen.getByRole('button', { name: 'Mark ready' }));
+
+    expect(screen.getByRole('heading', { name: 'Your setup is ready' })).toBeInTheDocument();
+    expect(screen.getByText('Pixabay download')).toBeInTheDocument();
+    expect(screen.getByText('Victory Crowd')).toBeInTheDocument();
+    expect(screen.getByText('Demo Creator')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Open Pixabay source page/i })).toHaveAttribute(
+      'href',
+      'https://pixabay.com/music/example-track-12345/',
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Back to cue point' }));
+    await user.click(screen.getByRole('button', { name: 'Back to anthems' }));
+
+    expect(screen.getByLabelText('Downloaded from Pixabay')).toBeChecked();
+    expect(screen.getByLabelText('Track title')).toHaveValue('Victory Crowd');
+  });
+
+  it('does not block audio use when the optional Pixabay source URL is invalid', async () => {
+    const user = userEvent.setup();
+
+    render(<MatchSetupFlow />);
+
+    await user.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
+    await user.click(screen.getByRole('button', { name: /North Harbor FC/i }));
+    await user.upload(screen.getByLabelText('Choose a local audio file'), new File(['local anthem'], 'anthem.mp3', { type: 'audio/mpeg' }));
+    await user.click(screen.getByLabelText('Downloaded from Pixabay'));
+    await user.type(screen.getByLabelText('Original Pixabay music-page URL'), 'https://evil.com/pixabay.com/music/example/');
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Use a pixabay.com music page URL.');
+
+    await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
+    await user.click(screen.getByRole('button', { name: 'Mark ready' }));
+
+    expect(screen.getByRole('heading', { name: 'Your setup is ready' })).toBeInTheDocument();
+    expect(screen.getByText('Invalid Pixabay URL not shown')).toBeInTheDocument();
+  });
+
+  it('rejects invalid local file selections and revokes the previous object URL when replacing a file', async () => {
+    const user = userEvent.setup();
+
+    render(<MatchSetupFlow />);
+
+    await user.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
+    await user.click(screen.getByRole('button', { name: /North Harbor FC/i }));
+
+    await user.upload(screen.getByLabelText('Choose a local audio file'), new File([], 'empty.mp3', { type: 'audio/mpeg' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose an audio file that is not empty.');
+
+    await user.upload(screen.getByLabelText('Choose a local audio file'), new File(['one'], 'first.mp3', { type: 'audio/mpeg' }));
+    await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
+    expect(await screen.findByLabelText('Preview selected anthem')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Back to anthems' }));
+    await user.upload(screen.getByLabelText('Choose a local audio file'), new File(['two'], 'second.mp3', { type: 'audio/mpeg' }));
+    await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
+
+    expect(createObjectUrlMock).toHaveBeenCalledTimes(2);
+    expect(revokeObjectUrlMock).toHaveBeenCalled();
   });
 
   it('stops preview playback and revokes object URLs when navigating back', async () => {
@@ -168,6 +260,40 @@ describe('MatchSetupFlow', () => {
     expect(screen.getByText('Playing anthem for North Harbor FC goal.')).toBeInTheDocument();
     expect(playSpy).toHaveBeenCalledTimes(1);
     expect(screen.getByLabelText('Match anthem playback')).toHaveProperty('currentTime', 0);
+  });
+
+  it('plays an imported local file for a new supported-team goal without replaying duplicate history', async () => {
+    const user = userEvent.setup();
+
+    await completeLocalFileSetup(user, 'North Harbor FC');
+    vi.useFakeTimers();
+    await startLocalFallbackMatchMode();
+
+    expect(screen.getByText(/pixabay-anthem\.mp3 · Pixabay download · Victory Crowd · Demo Creator/i)).toBeInTheDocument();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(56_000);
+    });
+
+    expect(screen.getByText('North Harbor FC goal')).toBeInTheDocument();
+    expect(screen.getByText('Playing anthem for North Harbor FC goal.')).toBeInTheDocument();
+    expect(playSpy).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(208_000);
+    });
+
+    expect(screen.getByText('Eastgate City goal')).toBeInTheDocument();
+    expect(screen.getByText('1-1')).toBeInTheDocument();
+    expect(playSpy).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Goal! Play anthem now' }));
+    expect(screen.getByText('Manual goal playback started.')).toBeInTheDocument();
+    expect(playSpy).toHaveBeenCalledTimes(2);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Stop anthem' }));
+    expect(screen.getByText('Anthem stopped.')).toBeInTheDocument();
+    expect(pauseSpy).toHaveBeenCalled();
   });
 
   it('does not play the anthem for opponent goals and supports manual playback', async () => {
@@ -313,6 +439,19 @@ async function completeDemoSetup(user: ReturnType<typeof userEvent.setup>, teamN
   await user.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
   await user.click(screen.getByRole('button', { name: new RegExp(teamName, 'i') }));
   await user.click(screen.getByRole('button', { name: /Stadium Pulse/i }));
+  await user.click(screen.getByRole('button', { name: 'Mark ready' }));
+}
+
+async function completeLocalFileSetup(user: ReturnType<typeof userEvent.setup>, teamName: 'North Harbor FC' | 'Eastgate City') {
+  render(<MatchSetupFlow />);
+
+  await user.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
+  await user.click(screen.getByRole('button', { name: new RegExp(teamName, 'i') }));
+  await user.upload(screen.getByLabelText('Choose a local audio file'), new File(['local anthem'], 'pixabay-anthem.mp3', { type: 'audio/mpeg' }));
+  await user.click(screen.getByLabelText('Downloaded from Pixabay'));
+  await user.type(screen.getByLabelText('Track title'), 'Victory Crowd');
+  await user.type(screen.getByLabelText('Creator or contributor'), 'Demo Creator');
+  await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
   await user.click(screen.getByRole('button', { name: 'Mark ready' }));
 }
 

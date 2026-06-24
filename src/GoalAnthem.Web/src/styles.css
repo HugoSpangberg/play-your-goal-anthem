@@ -430,57 +430,93 @@ h2 {
   width: 100%;
 }
 
-.spotify-panel {
+.pixabay-guide,
+.source-metadata,
+.metadata-fields {
   display: grid;
-  gap: 16px;
-  padding: 18px;
+  gap: 14px;
+}
+
+.pixabay-guide {
+  padding: 20px;
+  border: 1px solid #d5dde5;
+  border-radius: 12px;
+  background: #ffffff;
+}
+
+.pixabay-guide h4,
+.pixabay-guide p {
+  margin: 0;
+}
+
+.external-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.external-link-row a {
+  font-weight: 800;
+}
+
+.source-type-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px 20px;
+  padding: 16px;
   border: 1px solid #d5dde5;
   border-radius: 10px;
   background: #ffffff;
 }
 
-.spotify-panel__header {
-  display: flex;
-  gap: 16px;
-  justify-content: space-between;
-  align-items: flex-start;
+.source-type-options legend {
+  padding: 0 6px;
+  color: #226f54;
+  font-weight: 800;
 }
 
-.spotify-results {
-  display: grid;
-  gap: 10px;
-}
-
-.spotify-track {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  gap: 12px;
+.source-type-options label {
+  display: inline-flex;
+  gap: 8px;
   align-items: center;
-  padding: 12px;
+  font-weight: 700;
+}
+
+.metadata-fields {
+  padding: 16px;
   border: 1px solid #d5dde5;
-  border-radius: 8px;
-  background: #f8fbfa;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.metadata-fields summary {
+  cursor: pointer;
+  color: #226f54;
+  font-weight: 800;
+}
+
+.metadata-fields label {
+  display: grid;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.metadata-fields input,
+.metadata-fields textarea {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #9fb2c3;
+  border-radius: 10px;
+  background: #ffffff;
   color: inherit;
-  text-align: left;
+  font: inherit;
 }
 
-.spotify-track img {
-  border-radius: 4px;
-}
-
-.spotify-track span {
-  display: grid;
-  gap: 3px;
-}
-
-.spotify-track[data-selected="true"] {
+.metadata-fields input:focus-visible,
+.metadata-fields textarea:focus-visible {
   border-color: #226f54;
-  box-shadow: inset 0 0 0 2px #226f54;
-}
-
-.spotify-selection {
-  display: grid;
-  gap: 10px;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(34 111 84 / 18%);
 }
 
 .cue-layout {
@@ -782,10 +818,6 @@ h2 {
 
   .setup-section__header {
     flex-direction: column;
-  }
-
-  .spotify-panel__header {
-    display: grid;
   }
 
   .scoreboard {
