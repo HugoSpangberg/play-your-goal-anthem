@@ -27,26 +27,50 @@ dotnet run --project src/GoalAnthem.Api
 npm run dev --prefix src/GoalAnthem.Web
 ```
 
-Open `http://localhost:5173`. The Vite dev server proxies `/api` and `/hubs` to `http://localhost:5000`.
+Open `http://127.0.0.1:5173`. The Vite dev server proxies `/api` and `/hubs` to `http://localhost:5000`.
 
 Optional World Cup match data:
 
 ```bash
-export FootballData__ApiToken=
-dotnet run --project src/GoalAnthem.Api
+dotnet user-secrets set \
+  "FootballData:ApiToken" \
+  "YOUR_FOOTBALL_DATA_API_TOKEN" \
+  --project src/GoalAnthem.Api
+
+dotnet user-secrets list --project src/GoalAnthem.Api
 ```
 
-Set `FootballData__ApiToken` to a free football-data.org API token locally when you want World Cup fixture selection. Leave it empty for deterministic demo data. The free provider plan may return delayed schedule or score updates, so the UI does not present it as real-time goal detection. Never commit a real token.
+The API project has a committed non-secret `UserSecretsId`; the actual token is stored outside the repository. Restart the API after changing the token. Leave it unset for deterministic demo data. The free provider plan may return delayed schedule or score updates, so the UI does not present it as real-time goal detection. Never commit a real token.
 
 Optional Spotify companion setup:
 
+1. Create or open an app in the Spotify Developer Dashboard.
+2. Add this exact Redirect URI to the app settings:
+
+```text
+http://127.0.0.1:5173
+```
+
+Spotify requires an explicit loopback IP for local HTTP development; `localhost` is not accepted. The redirect URI must match exactly.
+
+3. Create the ignored frontend environment file:
+
 ```bash
-export VITE_SPOTIFY_CLIENT_ID=
-export VITE_SPOTIFY_REDIRECT_URI=http://localhost:5173
+cat > src/GoalAnthem.Web/.env.local <<'EOF'
+VITE_SPOTIFY_CLIENT_ID=YOUR_PUBLIC_SPOTIFY_CLIENT_ID
+VITE_SPOTIFY_REDIRECT_URI=http://127.0.0.1:5173
+EOF
+```
+
+4. Restart the Vite development server and open the same loopback URL:
+
+```bash
 npm run dev --prefix src/GoalAnthem.Web
 ```
 
-Create a Spotify Developer Dashboard app, add the redirect URI, and put only the public Client ID in `VITE_SPOTIFY_CLIENT_ID`. Do not use or commit a client secret. Spotify Web Playback SDK usage requires an eligible Spotify Premium account, and Spotify Development Mode restricts access to authorized users. The app remains fully usable with demo/local audio when Spotify is not configured.
+Open `http://127.0.0.1:5173`, not `http://localhost:5173`.
+
+Use only the public Spotify Client ID. Do not use or commit a client secret. Spotify Web Playback SDK usage requires an eligible Spotify Premium account, and Spotify Development Mode restricts access to authorized users. The app remains fully usable with demo/local audio when Spotify is not configured.
 
 Docker Compose:
 
