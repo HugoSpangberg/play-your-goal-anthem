@@ -3,9 +3,11 @@ using System.Net.Http.Json;
 using GoalAnthem.Application.Matches.GetMatches;
 using GoalAnthem.Application.MatchSessions;
 using Microsoft.AspNetCore.Http.Connections;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
+using Microsoft.Extensions.Configuration;
 
 namespace GoalAnthem.IntegrationTests;
 
@@ -15,7 +17,17 @@ public sealed class DemoMatchesEndpointTests : IClassFixture<WebApplicationFacto
 
     public DemoMatchesEndpointTests(WebApplicationFactory<Program> factory)
     {
-        this.factory = factory;
+        this.factory = factory.WithWebHostBuilder(builder =>
+        {
+            builder.ConfigureAppConfiguration((_, configuration) =>
+            {
+                configuration.AddInMemoryCollection(
+                    new Dictionary<string, string?>
+                    {
+                        ["FootballData:ApiToken"] = string.Empty
+                    });
+            });
+        });
     }
 
     [Fact]
