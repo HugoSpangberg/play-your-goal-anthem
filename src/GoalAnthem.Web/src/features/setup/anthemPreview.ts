@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type SyntheticEvent } from 'react';
-import { createDemoAnthemBlob, DemoAnthem } from '../anthems/demoAnthems';
 import { getSourceTypeLabel, type LocalAudioSourceMetadata } from '../anthems/localAudioSource';
 
-export type AnthemSelection =
-  | { kind: 'demo'; anthem: DemoAnthem }
-  | { kind: 'local'; file: File; source?: LocalAudioSourceMetadata };
+export type AnthemSelection = { kind: 'local'; file: File; source?: LocalAudioSourceMetadata };
 
 type PreviewState = {
   audioUrl: string;
@@ -31,20 +28,12 @@ export function useAnthemPreview(selection: AnthemSelection | undefined) {
       return undefined;
     }
 
-    const source =
-      selection.kind === 'demo'
-        ? {
-            audioUrl: URL.createObjectURL(createDemoAnthemBlob(selection.anthem)),
-            label: selection.anthem.name,
-            durationSeconds: selection.anthem.durationSeconds,
-            sourceLabel: 'Deterministic demo anthem',
-          }
-        : {
-            audioUrl: URL.createObjectURL(selection.file),
-            label: selection.file.name,
-            durationSeconds: null,
-            sourceLabel: getSourceTypeLabel(selection.source?.sourceType ?? 'local'),
-          };
+    const source = {
+      audioUrl: URL.createObjectURL(selection.file),
+      label: selection.file.name,
+      durationSeconds: null,
+      sourceLabel: getSourceTypeLabel(selection.source?.sourceType ?? 'local'),
+    };
 
     setPreview(source);
 

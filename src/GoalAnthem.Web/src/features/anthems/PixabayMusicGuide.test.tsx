@@ -9,16 +9,18 @@ describe('PixabayMusicGuide', () => {
 
     render(<PixabayMusicGuide />);
 
-    expect(screen.getByRole('heading', { name: 'Find royalty-free music' })).toBeInTheDocument();
-    expect(screen.getByText(/does not connect to Pixabay, download tracks, or verify licenses/i)).toBeInTheDocument();
-    expect(screen.getByText(/Imported files stay in this browser and are never uploaded/i)).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Need an anthem?' })).toBeInTheDocument();
+    expect(screen.getByText('Browse Pixabay Music', { selector: 'li' })).toBeInTheDocument();
+    expect(screen.getByText('Download a track')).toBeInTheDocument();
+    expect(screen.getByText('Return and upload it above')).toBeInTheDocument();
+    expect(screen.getByText('Source details and Content ID note')).toBeInTheDocument();
 
     const musicLink = screen.getByRole('link', { name: /Browse Pixabay Music/i });
     expect(musicLink).toHaveAttribute('href', 'https://pixabay.com/music/');
     expect(musicLink).toHaveAttribute('target', '_blank');
     expect(musicLink).toHaveAttribute('rel', 'noreferrer noopener');
 
-    const licenseLink = screen.getByRole('link', { name: /Read Pixabay Content License/i });
+    const licenseLink = screen.getByRole('link', { name: /Read license summary/i });
     expect(licenseLink).toHaveAttribute('href', 'https://pixabay.com/service/license-summary/');
     expect(licenseLink).toHaveAttribute('target', '_blank');
     expect(licenseLink).toHaveAttribute('rel', 'noreferrer noopener');
