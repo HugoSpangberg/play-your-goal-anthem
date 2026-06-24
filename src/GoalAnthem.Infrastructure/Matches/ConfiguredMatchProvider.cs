@@ -194,10 +194,12 @@ public sealed class ConfiguredMatchProvider(
             status,
             Team.Create(
                 new TeamId($"football-data-team-{record.HomeTeam.Id.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"),
-                record.HomeTeam.Name),
+                record.HomeTeam.Name,
+                CountryCodeResolver.Resolve(record.HomeTeam.Tla, record.HomeTeam.Name)),
             Team.Create(
                 new TeamId($"football-data-team-{record.AwayTeam.Id.Value.ToString(System.Globalization.CultureInfo.InvariantCulture)}"),
-                record.AwayTeam.Name));
+                record.AwayTeam.Name,
+                CountryCodeResolver.Resolve(record.AwayTeam.Tla, record.AwayTeam.Name)));
     }
 
     private static bool TryMapStatus(string? value, out MatchStatus status)
@@ -230,7 +232,7 @@ public sealed class ConfiguredMatchProvider(
         FootballDataTeamRecord? HomeTeam,
         FootballDataTeamRecord? AwayTeam);
 
-    private sealed record FootballDataTeamRecord(int? Id, string? Name);
+    private sealed record FootballDataTeamRecord(int? Id, string? Name, string? Tla);
 
     private sealed class FootballDataRateLimitException : Exception;
 }

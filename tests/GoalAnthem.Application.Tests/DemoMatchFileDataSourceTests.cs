@@ -20,6 +20,8 @@ public sealed class DemoMatchFileDataSourceTests
         Assert.Equal(3, matches.Count);
         Assert.Equal("demo-2026-summer-cup-001", matches[0].Id.Value);
         Assert.Equal("North Harbor FC", matches[0].HomeTeam.Name);
+        Assert.Equal("US", matches[0].HomeTeam.CountryCode);
+        Assert.Equal("GB", matches[0].AwayTeam.CountryCode);
     }
 
     private sealed class TestHostEnvironment(string contentRootPath) : IHostEnvironment

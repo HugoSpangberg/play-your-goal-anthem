@@ -36,15 +36,15 @@ public sealed class ConfiguredMatchProviderTests
                   "id": 1001,
                   "utcDate": "2026-06-11T19:00:00Z",
                   "status": "SCHEDULED",
-                  "homeTeam": { "id": 11, "name": "Canada" },
-                  "awayTeam": { "id": 12, "name": "Mexico" }
+                  "homeTeam": { "id": 11, "name": "Canada", "tla": "CAN" },
+                  "awayTeam": { "id": 12, "name": "Mexico", "tla": "MEX" }
                 },
                 {
                   "id": 1002,
                   "utcDate": "2026-06-12T21:00:00Z",
                   "status": "IN_PLAY",
-                  "homeTeam": { "id": 13, "name": "Brazil" },
-                  "awayTeam": { "id": 14, "name": "Japan" }
+                  "homeTeam": { "id": 13, "name": "Brazil", "tla": "BRA" },
+                  "awayTeam": { "id": 14, "name": "Japan", "tla": "JPN" }
                 },
                 {
                   "id": 1003,
@@ -75,17 +75,87 @@ public sealed class ConfiguredMatchProviderTests
             {
                 Assert.Equal("football-data-wc-1001", first.Id.Value);
                 Assert.Equal("Canada", first.HomeTeam.Name);
+                Assert.Equal("CA", first.HomeTeam.CountryCode);
                 Assert.Equal("Mexico", first.AwayTeam.Name);
+                Assert.Equal("MX", first.AwayTeam.CountryCode);
                 Assert.Equal(GoalAnthem.Domain.Matches.MatchStatus.Upcoming, first.Status);
             },
             second =>
             {
                 Assert.Equal("football-data-wc-1002", second.Id.Value);
+                Assert.Equal("BR", second.HomeTeam.CountryCode);
+                Assert.Equal("JP", second.AwayTeam.CountryCode);
                 Assert.Equal(GoalAnthem.Domain.Matches.MatchStatus.Live, second.Status);
             });
         Assert.Equal("free-token", http.Requests.Single().Headers.GetValues("X-Auth-Token").Single());
         Assert.Equal("/v4/competitions/WC/matches", http.Requests.Single().RequestUri?.PathAndQuery);
         Assert.DoesNotContain("status=", http.Requests.Single().RequestUri?.PathAndQuery, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task MapsKnownFootballCountryAliasesAndLeavesUnknownCountriesEmpty()
+    {
+        var http = new RecordingHttpMessageHandler(_ => JsonResponse(
+            """
+            {
+              "matches": [
+                {
+                  "id": 2001,
+                  "utcDate": "2026-06-11T19:00:00Z",
+                  "status": "SCHEDULED",
+                  "homeTeam": { "id": 21, "name": "United States", "tla": "USA" },
+                  "awayTeam": { "id": 22, "name": "Korea Republic" }
+                },
+                {
+                  "id": 2002,
+                  "utcDate": "2026-06-12T21:00:00Z",
+                  "status": "SCHEDULED",
+                  "homeTeam": { "id": 23, "name": "Côte d’Ivoire" },
+                  "awayTeam": { "id": 24, "name": "Unknown Team" }
+                },
+                {
+                  "id": 2003,
+                  "utcDate": "2026-06-13T21:00:00Z",
+                  "status": "SCHEDULED",
+                  "homeTeam": { "id": 25, "name": "DR Congo" },
+                  "awayTeam": { "id": 26, "name": "Türkiye" }
+                },
+                {
+                  "id": 2004,
+                  "utcDate": "2026-06-14T21:00:00Z",
+                  "status": "SCHEDULED",
+                  "homeTeam": { "id": 27, "name": "Cape Verde Islands" },
+                  "awayTeam": { "id": 28, "name": "Scotland" }
+                }
+              ]
+            }
+            """));
+        var provider = CreateProvider(http, apiToken: "free-token");
+
+        var result = await provider.GetMatchesAsync(new MatchProviderRequest(ForceRefresh: false), CancellationToken.None);
+
+        Assert.Collection(
+            result.Matches,
+            first =>
+            {
+                Assert.Equal("US", first.HomeTeam.CountryCode);
+                Assert.Equal("KR", first.AwayTeam.CountryCode);
+            },
+            second =>
+            {
+                Assert.Equal("CI", second.HomeTeam.CountryCode);
+                Assert.Null(second.AwayTeam.CountryCode);
+            },
+            third =>
+            {
+                Assert.Equal("CD", third.HomeTeam.CountryCode);
+                Assert.Equal("TR", third.AwayTeam.CountryCode);
+            },
+            fourth =>
+            {
+                Assert.Equal("CV", fourth.HomeTeam.CountryCode);
+                Assert.Equal("GB", fourth.AwayTeam.CountryCode);
+            });
     }
 
     [Fact]
