@@ -1,4 +1,7 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <UserSecretsId>GoalAnthem.Api-1d6816ec-612b-4b87-8910-29a236184c37</UserSecretsId>
+  </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../GoalAnthem.Application/GoalAnthem.Application.csproj" />
     <ProjectReference Include="../GoalAnthem.Infrastructure/GoalAnthem.Infrastructure.csproj" />
