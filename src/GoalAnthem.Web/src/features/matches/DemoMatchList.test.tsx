@@ -46,8 +46,12 @@ describe('DemoMatchList', () => {
     expect(screen.getByText(/World Cup API data is not configured/i)).toBeInTheDocument();
     expect(screen.getByText('Saturday, July 4')).toBeInTheDocument();
     expect(screen.getByText('Sunday, July 5')).toBeInTheDocument();
-    expect(match).toHaveTextContent('🇺🇸');
-    expect(match).toHaveTextContent('🇬🇧');
+    const matchFlagImages = match.querySelectorAll('.country-flag img');
+    expect(matchFlagImages).toHaveLength(2);
+    expect(matchFlagImages[0]?.getAttribute('src')).toContain('image/svg+xml');
+    expect(matchFlagImages[0]?.getAttribute('src')).not.toMatch(/^https?:\/\//);
+    expect(match).not.toHaveTextContent('🇺🇸');
+    expect(match).not.toHaveTextContent('🇬🇧');
 
     await userEvent.click(match);
 

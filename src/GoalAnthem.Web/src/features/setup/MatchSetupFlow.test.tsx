@@ -70,8 +70,8 @@ describe('MatchSetupFlow', () => {
 
     await user.click(await screen.findByRole('button', { name: /North Harbor FC versus Eastgate City/i }));
 
-    expect(screen.getByRole('button', { name: /North Harbor FC/i })).toHaveTextContent('🇺🇸');
-    expect(screen.getByRole('button', { name: /Eastgate City/i })).toHaveTextContent('🇬🇧');
+    expect(screen.getByRole('button', { name: /North Harbor FC/i }).querySelector('.country-flag img')).toHaveAttribute('src');
+    expect(screen.getByRole('button', { name: /Eastgate City/i }).querySelector('.country-flag img')).toHaveAttribute('src');
 
     await user.click(screen.getByRole('button', { name: /Eastgate City/i }));
     expect(screen.getByRole('heading', { name: 'Choose your goal anthem' })).toBeInTheDocument();
@@ -199,8 +199,9 @@ describe('MatchSetupFlow', () => {
     await completeReadySetup(user);
 
     expect(screen.getByText('Ready for kickoff')).toBeInTheDocument();
-    expect(screen.getAllByText('🇺🇸').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('🇬🇧').length).toBeGreaterThan(0);
+    const readyTeams = document.querySelectorAll('.ready-team');
+    expect(readyTeams[0]?.querySelector('.country-flag img')).toHaveAttribute('src');
+    expect(readyTeams[1]?.querySelector('.country-flag img')).toHaveAttribute('src');
     expect(screen.getByText('Press start when kickoff visibly happens.')).toBeInTheDocument();
     expect(screen.getByText('Do not use the scheduled time.', { exact: false })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start when kickoff happens on TV' })).toBeInTheDocument();
@@ -222,6 +223,9 @@ describe('MatchSetupFlow', () => {
     expect(screen.getByText('Your team')).toBeInTheDocument();
     expect(screen.getByText('● Local simulation')).toBeInTheDocument();
     expect(screen.getByText('Testing · 15x')).toBeInTheDocument();
+    const scoreboardTeams = document.querySelectorAll('.scoreboard__team');
+    expect(scoreboardTeams[0]?.querySelector('.country-flag img')).toHaveAttribute('src');
+    expect(scoreboardTeams[1]?.querySelector('.country-flag img')).toHaveAttribute('src');
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(56_000);

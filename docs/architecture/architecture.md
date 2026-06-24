@@ -70,7 +70,7 @@ flowchart TD
 1. Application DTOs expose optional provider-neutral ISO alpha-2 country codes for teams.
 2. Demo data stores stable country codes in version-controlled JSON.
 3. football-data.org team identifiers are mapped centrally in Infrastructure from known football TLAs and controlled team-name aliases.
-4. Web renders country flags locally from those country codes as Unicode emoji with a neutral fallback.
+4. Web renders country flags locally from bundled SVG assets with a neutral fallback only when no usable country code exists.
 5. No external flag image service is used at runtime.
 
 ## Error Handling

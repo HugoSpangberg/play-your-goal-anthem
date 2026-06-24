@@ -1,24 +1,35 @@
+import { flagAssets } from './flagAssets';
+
 type CountryFlagProps = {
   countryCode?: string | null;
+  countryName: string;
   decorative?: boolean;
-  label?: string;
-  size?: 'small' | 'large';
+  size?: 'small' | 'medium' | 'large';
 };
 
-export function CountryFlag({ countryCode, decorative = false, label, size = 'small' }: CountryFlagProps) {
+export function CountryFlag({ countryCode, countryName, decorative = false, size = 'small' }: CountryFlagProps) {
   const normalizedCode = normalizeCountryCode(countryCode);
-  const flag = normalizedCode ? codeToFlagEmoji(normalizedCode) : null;
-  const accessibleLabel = label ?? (normalizedCode ? `Flag of ${normalizedCode}` : 'Country unavailable');
+  const flagAsset = normalizedCode ? flagAssets[normalizedCode as keyof typeof flagAssets] : undefined;
+  const accessibleLabel = `Flag of ${countryName}`;
+  const fallbackLabel = getFallbackAbbreviation(countryName);
+  const hasFlag = Boolean(flagAsset);
 
   return (
     <span
-      aria-hidden={decorative ? 'true' : undefined}
-      aria-label={decorative ? undefined : accessibleLabel}
-      className="country-flag"
-      data-size={size}
-      role={decorative ? undefined : 'img'}
+      aria-hidden={decorative ? true : undefined}
+      className={`country-flag country-flag--${size}`}
+      data-has-flag={hasFlag}
+      data-testid={`country-flag-${normalizedCode ?? fallbackLabel.toLowerCase()}`}
+      role={!decorative && !flagAsset ? 'img' : undefined}
+      aria-label={!decorative && !flagAsset ? accessibleLabel : undefined}
     >
-      {flag ?? <span aria-hidden="true">•</span>}
+      {flagAsset ? (
+        <img alt={decorative ? '' : accessibleLabel} className="country-flag__image" src={flagAsset} />
+      ) : (
+        <span aria-hidden={decorative ? true : undefined} className="country-flag__fallback">
+          {fallbackLabel}
+        </span>
+      )}
     </span>
   );
 }
@@ -32,7 +43,15 @@ function normalizeCountryCode(countryCode?: string | null) {
   return /^[A-Z]{2}$/.test(normalized) ? normalized : null;
 }
 
-function codeToFlagEmoji(countryCode: string) {
-  const base = 127397;
-  return String.fromCodePoint(...[...countryCode].map((character) => base + character.charCodeAt(0)));
+function getFallbackAbbreviation(countryName: string) {
+  const words = countryName
+    .split(/[\s-]+/)
+    .map((word) => word.replace(/[^A-Za-z]/g, ''))
+    .filter(Boolean);
+
+  if (words.length >= 2) {
+    return `${words[0][0]}${words[1][0]}`.toUpperCase();
+  }
+
+  return countryName.replace(/[^A-Za-z]/g, '').slice(0, 2).toUpperCase() || '??';
 }

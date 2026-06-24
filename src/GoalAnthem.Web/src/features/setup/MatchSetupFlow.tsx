@@ -286,7 +286,7 @@ function TeamSelectionStep({
               onClick={() => onSelectTeam(team)}
               type="button"
             >
-              <CountryFlag countryCode={team.countryCode} label={`Flag of ${team.name}`} size="large" />
+              <CountryFlag countryCode={team.countryCode} countryName={team.name} decorative size="large" />
               <span className="team-card__label">{team.name}</span>
               <span className="team-card__status">{isSelected ? 'Selected' : `Support ${team.name}`}</span>
             </button>
@@ -592,12 +592,12 @@ function ReadyStep({
 
       <div className="ready-match-card">
         <div className="ready-team">
-          <CountryFlag countryCode={draft.match.homeTeam.countryCode} decorative size="large" />
+          <CountryFlag countryCode={draft.match.homeTeam.countryCode} countryName={draft.match.homeTeam.name} decorative size="medium" />
           <strong>{draft.match.homeTeam.name}</strong>
         </div>
         <span className="ready-vs">vs</span>
         <div className="ready-team">
-          <CountryFlag countryCode={draft.match.awayTeam.countryCode} decorative size="large" />
+          <CountryFlag countryCode={draft.match.awayTeam.countryCode} countryName={draft.match.awayTeam.name} decorative size="medium" />
           <strong>{draft.match.awayTeam.name}</strong>
         </div>
         <time dateTime={draft.match.kickoffTime}>{formatMatchDateTime(draft.match.kickoffTime)}</time>
@@ -923,7 +923,7 @@ function ScoreboardTeam({ align = 'start', score, supportedTeamId, team }: { ali
 
   return (
     <div className="scoreboard__team" data-align={align} data-supported={isSupported}>
-      <CountryFlag countryCode={team.countryCode} decorative size="large" />
+      <CountryFlag countryCode={team.countryCode} countryName={team.name} decorative size="large" />
       <span>{team.name}</span>
       <strong>{score}</strong>
       {isSupported ? <em>Your team</em> : null}
@@ -1073,7 +1073,7 @@ function formatConnectionStatus(status: string) {
 function teamWithFlag(team: Team) {
   return (
     <span className="inline-team">
-      <CountryFlag countryCode={team.countryCode} decorative />
+      <CountryFlag countryCode={team.countryCode} countryName={team.name} decorative />
       <span>{team.name}</span>
     </span>
   );

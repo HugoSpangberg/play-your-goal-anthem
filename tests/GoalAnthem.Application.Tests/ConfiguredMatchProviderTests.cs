@@ -126,6 +126,27 @@ public sealed class ConfiguredMatchProviderTests
                   "status": "SCHEDULED",
                   "homeTeam": { "id": 27, "name": "Cape Verde Islands" },
                   "awayTeam": { "id": 28, "name": "Scotland" }
+                },
+                {
+                  "id": 2005,
+                  "utcDate": "2026-06-15T21:00:00Z",
+                  "status": "SCHEDULED",
+                  "homeTeam": { "id": 29, "name": "Qatar", "tla": "QAT" },
+                  "awayTeam": { "id": 30, "name": "South Africa", "tla": "RSA" }
+                },
+                {
+                  "id": 2006,
+                  "utcDate": "2026-06-16T21:00:00Z",
+                  "status": "SCHEDULED",
+                  "homeTeam": { "id": 31, "name": "Netherlands", "tla": "NED" },
+                  "awayTeam": { "id": 32, "name": "Saudi Arabia", "tla": "KSA" }
+                },
+                {
+                  "id": 2007,
+                  "utcDate": "2026-06-17T21:00:00Z",
+                  "status": "SCHEDULED",
+                  "homeTeam": { "id": 33, "name": "Bosnia-Herzegovina" },
+                  "awayTeam": { "id": 34, "name": "Uzbekistan", "tla": "UZB" }
                 }
               ]
             }
@@ -155,6 +176,21 @@ public sealed class ConfiguredMatchProviderTests
             {
                 Assert.Equal("CV", fourth.HomeTeam.CountryCode);
                 Assert.Equal("GB", fourth.AwayTeam.CountryCode);
+            },
+            fifth =>
+            {
+                Assert.Equal("QA", fifth.HomeTeam.CountryCode);
+                Assert.Equal("ZA", fifth.AwayTeam.CountryCode);
+            },
+            sixth =>
+            {
+                Assert.Equal("NL", sixth.HomeTeam.CountryCode);
+                Assert.Equal("SA", sixth.AwayTeam.CountryCode);
+            },
+            seventh =>
+            {
+                Assert.Equal("BA", seventh.HomeTeam.CountryCode);
+                Assert.Equal("UZ", seventh.AwayTeam.CountryCode);
             });
     }
 

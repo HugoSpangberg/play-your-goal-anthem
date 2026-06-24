@@ -199,11 +199,11 @@ function MatchCard({ isSelected, match, onSelect }: { isSelected: boolean; match
     >
       <span className="match-card__teams">
         <span className="match-card__team">
-          <CountryFlag countryCode={match.homeTeam.countryCode} decorative />
+          <CountryFlag countryCode={match.homeTeam.countryCode} countryName={match.homeTeam.name} decorative />
           <span>{match.homeTeam.name}</span>
         </span>
         <span className="match-card__team">
-          <CountryFlag countryCode={match.awayTeam.countryCode} decorative />
+          <CountryFlag countryCode={match.awayTeam.countryCode} countryName={match.awayTeam.name} decorative />
           <span>{match.awayTeam.name}</span>
         </span>
       </span>
