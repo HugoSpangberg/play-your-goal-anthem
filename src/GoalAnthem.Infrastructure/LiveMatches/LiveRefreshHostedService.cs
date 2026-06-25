@@ -1,4 +1,5 @@
 using GoalAnthem.Application.LiveMatches;
+using GoalAnthem.Infrastructure.Matches;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
@@ -7,11 +8,15 @@ namespace GoalAnthem.Infrastructure.LiveMatches;
 public sealed class LiveRefreshHostedService(
     AdaptiveMatchSessionService sessions,
     IEnumerable<ILiveMatchFeedProvider> providers,
+    ConfiguredMatchProvider footballDataProvider,
     ILogger<LiveRefreshHostedService> logger,
     TimeProvider timeProvider)
     : IHostedService, IAsyncDisposable
 {
-    private readonly IReadOnlyList<ILiveMatchFeedProvider> sources = providers.ToArray();
+    private readonly IReadOnlyList<ILiveMatchFeedProvider> sources = providers
+        .Append(footballDataProvider)
+        .DistinctBy(source => source.Name, StringComparer.Ordinal)
+        .ToArray();
     private readonly Dictionary<string, DateTimeOffset> nextRun = new(StringComparer.Ordinal);
     private ITimer? timer;
     private int isRunning;
