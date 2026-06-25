@@ -6,11 +6,13 @@
       "status": "playable",
       "homeTeam": {
         "id": "north-harbor-fc",
-        "name": "North Harbor FC"
+        "name": "North Harbor FC",
+        "countryCode": "US"
       },
       "awayTeam": {
         "id": "eastgate-city",
-        "name": "Eastgate City"
+        "name": "Eastgate City",
+        "countryCode": "GB"
       }
     },
     {
@@ -19,11 +21,13 @@
       "status": "upcoming",
       "homeTeam": {
         "id": "riverside-athletic",
-        "name": "Riverside Athletic"
+        "name": "Riverside Athletic",
+        "countryCode": "BR"
       },
       "awayTeam": {
         "id": "valley-rovers",
-        "name": "Valley Rovers"
+        "name": "Valley Rovers",
+        "countryCode": "JP"
       }
     },
     {
@@ -32,11 +36,13 @@
       "status": "upcoming",
       "homeTeam": {
         "id": "lakeside-united",
-        "name": "Lakeside United"
+        "name": "Lakeside United",
+        "countryCode": "SE"
       },
       "awayTeam": {
         "id": "hillcrest-fc",
-        "name": "Hillcrest FC"
+        "name": "Hillcrest FC",
+        "countryCode": "DE"
       }
     }
   ]

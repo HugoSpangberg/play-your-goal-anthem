@@ -34,7 +34,7 @@ public sealed class GetMatchesHandler(IMatchProvider matchProvider)
             Map(match.HomeTeam),
             Map(match.AwayTeam));
 
-    private static TeamDto Map(Team team) => new(team.Id.Value, team.Name);
+    private static TeamDto Map(Team team) => new(team.Id.Value, team.Name, team.CountryCode);
 
     private static string Map(MatchDataSource source) =>
         source switch

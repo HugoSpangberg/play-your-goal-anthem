@@ -8,8 +8,15 @@ const demoMatches = [
     id: 'demo-2026-summer-cup-001',
     kickoffTime: '2026-07-04T18:00:00+02:00',
     status: 'playable',
-    homeTeam: { id: 'north-harbor-fc', name: 'North Harbor FC' },
-    awayTeam: { id: 'eastgate-city', name: 'Eastgate City' },
+    homeTeam: { id: 'north-harbor-fc', name: 'North Harbor FC', countryCode: 'US' },
+    awayTeam: { id: 'eastgate-city', name: 'Eastgate City', countryCode: 'GB' },
+  },
+  {
+    id: 'demo-2026-summer-cup-002',
+    kickoffTime: '2026-07-05T20:30:00+02:00',
+    status: 'upcoming',
+    homeTeam: { id: 'riverside-athletic', name: 'Riverside Athletic', countryCode: 'BR' },
+    awayTeam: { id: 'valley-rovers', name: 'Valley Rovers', countryCode: 'JP' },
   },
 ];
 
@@ -23,24 +30,12 @@ describe('MatchSetupFlow', () => {
     createObjectUrlMock = vi.fn(() => `blob:${Math.random().toString(16).slice(2)}`);
     revokeObjectUrlMock = vi.fn();
 
-    Object.defineProperty(URL, 'createObjectURL', {
-      configurable: true,
-      value: createObjectUrlMock,
-    });
-    Object.defineProperty(URL, 'revokeObjectURL', {
-      configurable: true,
-      value: revokeObjectUrlMock,
-    });
+    Object.defineProperty(URL, 'createObjectURL', { configurable: true, value: createObjectUrlMock });
+    Object.defineProperty(URL, 'revokeObjectURL', { configurable: true, value: revokeObjectUrlMock });
     playSpy = vi.fn().mockResolvedValue(undefined);
     pauseSpy = vi.fn();
-    Object.defineProperty(HTMLMediaElement.prototype, 'play', {
-      configurable: true,
-      value: playSpy,
-    });
-    Object.defineProperty(HTMLMediaElement.prototype, 'pause', {
-      configurable: true,
-      value: pauseSpy,
-    });
+    Object.defineProperty(HTMLMediaElement.prototype, 'play', { configurable: true, value: playSpy });
+    Object.defineProperty(HTMLMediaElement.prototype, 'pause', { configurable: true, value: pauseSpy });
     stubMatches();
   });
 
@@ -49,233 +44,266 @@ describe('MatchSetupFlow', () => {
     vi.restoreAllMocks();
   });
 
-  it('moves from match selection to team selection and back to matches', async () => {
+  it('uses guarded setup navigation and moves focus to selected steps', async () => {
+    const user = userEvent.setup();
     render(<MatchSetupFlow />);
 
-    const matchButton = await screen.findByRole('button', { name: /North Harbor FC/i });
+    expect(screen.getByRole('button', { name: 'Match: current' })).toHaveAttribute('aria-current', 'step');
+    expect(screen.getByRole('button', { name: 'Team: locked' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Anthem: locked' })).toBeDisabled();
 
-    await userEvent.click(matchButton);
+    await user.click(await screen.findByRole('button', { name: /North Harbor FC versus Eastgate City/i }));
 
-    expect(screen.getByRole('heading', { name: 'Which team do you support in this match?' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /North Harbor FC/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Eastgate City/i })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Choose the team/i })).toHaveFocus();
+    expect(screen.getByRole('button', { name: 'Match: completed' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Team: current' })).toHaveAttribute('aria-current', 'step');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Back to matches' }));
+    await user.click(screen.getByRole('button', { name: 'Match: completed' }));
 
-    const returnedMatchButton = await screen.findByRole('button', { name: /North Harbor FC/i });
-
-    expect(screen.getByRole('heading', { name: 'Select a match' })).toBeInTheDocument();
-    expect(returnedMatchButton).toHaveAttribute('aria-pressed', 'true');
-    expect(returnedMatchButton).toHaveTextContent('Selected match');
+    expect((await screen.findAllByRole('heading', { name: 'Select a match' })).length).toBeGreaterThan(0);
+    expect(screen.getByRole('button', { name: /North Harbor FC versus Eastgate City/i })).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('allows selecting either team and preserves the selection when revisiting the team step', async () => {
+  it('shows flags in team selection and preserves team/audio choices when navigating backward', async () => {
+    const user = userEvent.setup();
     render(<MatchSetupFlow />);
 
-    await userEvent.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
+    await user.click(await screen.findByRole('button', { name: /North Harbor FC versus Eastgate City/i }));
 
-    await userEvent.click(screen.getByRole('button', { name: /Eastgate City/i }));
-    expect(screen.getByRole('heading', { name: 'Select a demo anthem or use a local audio file' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /North Harbor FC/i }).querySelector('.country-flag img')).toHaveAttribute('src');
+    expect(screen.getByRole('button', { name: /Eastgate City/i }).querySelector('.country-flag img')).toHaveAttribute('src');
 
-    await userEvent.click(screen.getByRole('button', { name: 'Back to team' }));
+    await user.click(screen.getByRole('button', { name: /Eastgate City/i }));
+    expect(screen.getByRole('heading', { name: 'Choose your goal anthem' })).toBeInTheDocument();
+
+    await uploadLocalFile(user, 'supporter-anthem.mp3');
+    await user.click(screen.getByRole('button', { name: 'Team: completed' }));
     expect(screen.getByRole('button', { name: /Eastgate City/i })).toHaveAttribute('aria-pressed', 'true');
 
-    await userEvent.click(screen.getByRole('button', { name: /North Harbor FC/i }));
-    expect(screen.getByRole('heading', { name: 'Select a demo anthem or use a local audio file' })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Back to team' }));
-    expect(screen.getByRole('button', { name: /North Harbor FC/i })).toHaveAttribute('aria-pressed', 'true');
+    await user.click(screen.getByRole('button', { name: 'Anthem: available' }));
+    expect(screen.getByText('supporter-anthem.mp3')).toBeInTheDocument();
   });
 
-  it('lets the user choose a local file, use the current playback position, validate the cue, test playback, and reach ready', async () => {
+  it('clears downstream choices when changing match and when replacing the local file', async () => {
+    const user = userEvent.setup();
     render(<MatchSetupFlow />);
 
-    await userEvent.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
-    await userEvent.click(screen.getByRole('button', { name: /North Harbor FC/i }));
+    await completeReadySetup(user);
+    await user.click(screen.getByRole('button', { name: 'Match: completed' }));
+    await user.click(await screen.findByRole('button', { name: /Riverside Athletic versus Valley Rovers/i }));
 
-    const fileInput = screen.getByLabelText('Choose a local audio file');
-    const localFile = new File(['local anthem'], 'supporter-anthem.mp3', { type: 'audio/mpeg' });
+    expect(screen.getByRole('button', { name: 'Anthem: locked' })).toBeDisabled();
 
-    await userEvent.upload(fileInput, localFile);
+    await user.click(screen.getByRole('button', { name: /Riverside Athletic/i }));
+    await uploadLocalFile(user, 'first.mp3');
+    await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
+    await user.click(screen.getByRole('button', { name: 'Save cue point' }));
+    await user.click(screen.getByRole('button', { name: 'Anthem: completed' }));
+    await uploadLocalFile(user, 'second.mp3');
+
+    expect(screen.getByRole('button', { name: 'Ready: locked' })).toBeDisabled();
+  });
+
+  it('renders local-file-first anthem selection with optional Pixabay metadata and no generated demo cards', async () => {
+    const user = userEvent.setup();
+    render(<MatchSetupFlow />);
+
+    await user.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
+    await user.click(screen.getByRole('button', { name: /North Harbor FC/i }));
+
+    expect(screen.getByRole('heading', { name: 'Choose your goal anthem' })).toBeInTheDocument();
+    expect(screen.queryByText('Stadium Pulse')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Continue to cue point' })).toBeDisabled();
+    expect(screen.getByRole('heading', { name: 'Need an anthem?' })).toBeInTheDocument();
+    expect(screen.getByText('Return and upload it above')).toBeInTheDocument();
+
+    await uploadLocalFile(user, 'pixabay-anthem.wav', 'audio/wav');
+    await user.click(screen.getByLabelText('Downloaded from Pixabay'));
+    expect(screen.getByLabelText('Track title')).not.toBeVisible();
+    await user.click(screen.getByText('Source details and license notes'));
+    await user.type(screen.getByLabelText('Track title'), 'Victory Crowd');
+    await user.type(screen.getByLabelText('Creator or contributor'), 'Demo Creator');
+    await user.type(screen.getByLabelText('Original Pixabay music-page URL'), 'https://evil.com/pixabay.com/music/example/');
+
+    expect(screen.getByRole('alert')).toHaveTextContent('Use a pixabay.com music page URL.');
+
+    await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
+    await user.click(screen.getByRole('button', { name: 'Save cue point' }));
+
+    expect(screen.getByRole('heading', { name: 'Ready for kickoff' })).toBeInTheDocument();
+    expect(screen.getByText('Victory Crowd · Demo Creator')).toBeInTheDocument();
+  });
+
+  it('rejects invalid local files and revokes object URLs when replacing files or leaving preview', async () => {
+    const user = userEvent.setup();
+    render(<MatchSetupFlow />);
+
+    await user.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
+    await user.click(screen.getByRole('button', { name: /North Harbor FC/i }));
+
+    await user.upload(screen.getByLabelText('Choose a local audio file'), new File([], 'empty.mp3', { type: 'audio/mpeg' }));
+    expect(screen.getByRole('alert')).toHaveTextContent('Choose an audio file that is not empty.');
+
+    await uploadLocalFile(user, 'first.mp3');
+    await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
+    expect(await screen.findByLabelText('Preview selected anthem')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Anthem: completed' }));
+    await uploadLocalFile(user, 'second.mp3');
+    await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
+
+    expect(createObjectUrlMock).toHaveBeenCalledTimes(2);
+    expect(revokeObjectUrlMock).toHaveBeenCalled();
+    expect(pauseSpy).toHaveBeenCalled();
+  });
+
+  it('synchronizes slider and time input, previews from cue, and saves the cue point', async () => {
+    const user = userEvent.setup();
+    render(<MatchSetupFlow />);
+
+    await user.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
+    await user.click(screen.getByRole('button', { name: /North Harbor FC/i }));
+    await uploadLocalFile(user, 'supporter-anthem.mp3');
+    await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
 
     const audio = await screen.findByLabelText('Preview selected anthem');
     setAudioMetadata(audio as HTMLAudioElement, { currentTime: 27, duration: 125 });
     fireEvent.loadedMetadata(audio);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Use current playback position' }));
-    expect(screen.getByLabelText('Start position in mm:ss')).toHaveValue('00:27');
+    fireEvent.change(screen.getByLabelText('Cue position'), { target: { value: '12' } });
+    expect(screen.getByLabelText('Exact time in mm:ss')).toHaveValue('00:12');
 
-    await userEvent.clear(screen.getByLabelText('Start position in mm:ss'));
-    await userEvent.type(screen.getByLabelText('Start position in mm:ss'), '02:10');
+    await user.click(screen.getByRole('button', { name: 'Use current position' }));
+    expect(screen.getByLabelText('Exact time in mm:ss')).toHaveValue('00:27');
+
+    await user.clear(screen.getByLabelText('Exact time in mm:ss'));
+    await user.type(screen.getByLabelText('Exact time in mm:ss'), '02:10');
     expect(screen.getByRole('alert')).toHaveTextContent('Cue point must be at or before 02:05.');
 
-    await userEvent.clear(screen.getByLabelText('Start position in mm:ss'));
-    await userEvent.type(screen.getByLabelText('Start position in mm:ss'), '01:15');
+    await user.clear(screen.getByLabelText('Exact time in mm:ss'));
+    await user.type(screen.getByLabelText('Exact time in mm:ss'), '01:15');
+    await user.click(screen.getByRole('button', { name: 'Preview from 01:15' }));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Test anthem' }));
     expect(playSpy).toHaveBeenCalled();
     expect(audio).toHaveProperty('currentTime', 75);
 
-    await userEvent.click(screen.getByRole('button', { name: 'Mark ready' }));
-
-    expect(screen.getByRole('heading', { name: 'Your setup is ready' })).toBeInTheDocument();
-    expect(screen.getByText('Match', { selector: 'dt' })).toBeInTheDocument();
-    expect(screen.getByText('North Harbor FC vs Eastgate City')).toBeInTheDocument();
-    expect(screen.getByText('Supported team', { selector: 'dt' })).toBeInTheDocument();
-    expect(screen.getByText('North Harbor FC')).toBeInTheDocument();
-    expect(screen.getByText('Anthem', { selector: 'dt' })).toBeInTheDocument();
-    expect(screen.getByText('Local file: supporter-anthem.mp3')).toBeInTheDocument();
-    expect(screen.getByText('Cue point', { selector: 'dt' })).toBeInTheDocument();
-    expect(screen.getByText('01:15')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Save cue point' }));
+    expect(screen.getByRole('heading', { name: 'Ready for kickoff' })).toBeInTheDocument();
+    expect(screen.getByText('Cue point: 01:15')).toBeInTheDocument();
   });
 
-  it('stops preview playback and revokes object URLs when navigating back', async () => {
+  it('shows Ready flags, TV synchronization guidance, normal speed default, and explicit start CTA', async () => {
+    const user = userEvent.setup();
     render(<MatchSetupFlow />);
 
-    await userEvent.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
-    await userEvent.click(screen.getByRole('button', { name: /North Harbor FC/i }));
-    await userEvent.click(screen.getByRole('button', { name: /Stadium Pulse/i }));
+    await completeReadySetup(user);
 
-    expect(screen.getByRole('heading', { name: 'Set where the anthem should begin' })).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole('button', { name: 'Back to anthems' }));
-
-    expect(pauseSpy).toHaveBeenCalled();
-    expect(revokeObjectUrlMock).toHaveBeenCalled();
-    expect(screen.getByRole('heading', { name: 'Select a demo anthem or use a local audio file' })).toBeInTheDocument();
+    expect(screen.getByText('Ready for kickoff')).toBeInTheDocument();
+    const readyTeams = document.querySelectorAll('.ready-team');
+    expect(readyTeams[0]?.querySelector('.country-flag img')).toHaveAttribute('src');
+    expect(readyTeams[1]?.querySelector('.country-flag img')).toHaveAttribute('src');
+    expect(screen.getByText('Press start when kickoff visibly happens.')).toBeInTheDocument();
+    expect(screen.getByText('Do not use the scheduled time.', { exact: false })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start when kickoff happens on TV' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Use 15x demo speed')).not.toBeChecked();
   });
 
-  it('starts match mode from Ready and plays the anthem for a supported-team goal', async () => {
+  it('starts local fallback match mode with flags, supported-team marker, manual playback, stop, and cleanup', async () => {
     const user = userEvent.setup();
+    render(<MatchSetupFlow />);
 
-    await completeDemoSetup(user, 'North Harbor FC');
-
-    vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
-
-    expect(screen.getByRole('heading', { name: 'Match mode' })).toBeInTheDocument();
-    expect(screen.getByText('Kickoff')).toBeInTheDocument();
-    expect(screen.getAllByText("0'").length).toBeGreaterThan(0);
-    expect(screen.getByText("Synchronized at 0' from local kickoff.")).toBeInTheDocument();
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(56_000);
-    });
-
-    expect(screen.getAllByText("14'").length).toBeGreaterThan(0);
-    expect(screen.getByText('North Harbor FC goal')).toBeInTheDocument();
-    expect(screen.getByText('1-0')).toBeInTheDocument();
-    expect(screen.getByText('Playing anthem for North Harbor FC goal.')).toBeInTheDocument();
-    expect(playSpy).toHaveBeenCalledTimes(1);
-    expect(screen.getByLabelText('Match anthem playback')).toHaveProperty('currentTime', 0);
-  });
-
-  it('does not play the anthem for opponent goals and supports manual playback', async () => {
-    const user = userEvent.setup();
-
-    await completeDemoSetup(user, 'Eastgate City');
-    vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(56_000);
-    });
-
-    expect(screen.getByText('North Harbor FC goal')).toBeInTheDocument();
-    expect(screen.queryByText('Playing anthem for North Harbor FC goal.')).not.toBeInTheDocument();
-    expect(playSpy).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Goal! Play anthem now' }));
-
-    expect(screen.getByText('Manual goal playback started.')).toBeInTheDocument();
-    expect(playSpy).toHaveBeenCalledTimes(1);
-  });
-
-  it('supports normal speed and stop playback controls', async () => {
-    const user = userEvent.setup();
-
-    await completeDemoSetup(user, 'North Harbor FC');
-    await user.click(screen.getByLabelText('Normal speed (1x)'));
-    vi.useFakeTimers();
-    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
-
-    await act(async () => {
-      await vi.advanceTimersByTimeAsync(60_000);
-    });
-
-    expect(screen.getAllByText("1'").length).toBeGreaterThan(0);
-    expect(playSpy).not.toHaveBeenCalled();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Goal! Play anthem now' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Stop anthem' }));
-
-    expect(screen.getByText('Anthem stopped.')).toBeInTheDocument();
-    expect(pauseSpy).toHaveBeenCalled();
-  });
-
-  it('cleans up audio and timers when leaving match mode', async () => {
-    const user = userEvent.setup();
-
-    await completeDemoSetup(user, 'North Harbor FC');
+    await completeReadySetup(user);
+    await user.click(screen.getByText('Testing'));
+    await user.click(screen.getByLabelText('Use 15x demo speed'));
     vi.useFakeTimers();
     const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
-    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
-    fireEvent.click(screen.getByRole('button', { name: 'End match mode' }));
+    await startLocalFallbackMatchMode();
 
-    expect(screen.getByRole('heading', { name: 'Your setup is ready' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Follow the match' })).toBeInTheDocument();
+    expect(screen.getByText('Your team')).toBeInTheDocument();
+    expect(screen.getByText('● Local simulation')).toBeInTheDocument();
+    expect(screen.getByText('Testing · 15x')).toBeInTheDocument();
+    const scoreboardTeams = document.querySelectorAll('.scoreboard__team');
+    expect(scoreboardTeams[0]?.querySelector('.country-flag img')).toHaveAttribute('src');
+    expect(scoreboardTeams[1]?.querySelector('.country-flag img')).toHaveAttribute('src');
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(56_000);
+    });
+
+    expect(screen.getByText('North Harbor FC goal')).toBeInTheDocument();
+    expect(screen.getByText('Playing anthem')).toBeInTheDocument();
+    expect(playSpy).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Play anthem manually' }));
+    expect(playSpy).toHaveBeenCalledTimes(2);
+    fireEvent.click(screen.getByRole('button', { name: 'Stop anthem' }));
+    expect(screen.getByText('Anthem stopped')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'End match mode' }));
+    expect(screen.getByRole('heading', { name: 'Ready for kickoff' })).toBeInTheDocument();
     expect(clearIntervalSpy).toHaveBeenCalled();
-    expect(pauseSpy).toHaveBeenCalled();
     expect(revokeObjectUrlMock).toHaveBeenCalled();
   });
 
-  it('does not restart the match engine when snapshot updates trigger rerenders', async () => {
+  it('keeps opponent goals from playing audio and avoids engine restarts across renders', async () => {
     const user = userEvent.setup();
+    render(<MatchSetupFlow />);
 
-    await completeDemoSetup(user, 'North Harbor FC');
+    await user.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
+    await user.click(screen.getByRole('button', { name: /Eastgate City/i }));
+    await uploadLocalFile(user, 'supporter-anthem.mp3');
+    await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
+    await user.click(screen.getByRole('button', { name: 'Save cue point' }));
+    await user.click(screen.getByText('Testing'));
+    await user.click(screen.getByLabelText('Use 15x demo speed'));
 
     vi.useFakeTimers();
     const setIntervalSpy = vi.spyOn(window, 'setInterval');
-    const clearIntervalSpy = vi.spyOn(window, 'clearInterval');
-    fireEvent.click(screen.getByRole('button', { name: 'Start match' }));
-
-    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
-    expect(vi.getTimerCount()).toBe(1);
+    await startLocalFallbackMatchMode();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(56_000);
     });
 
+    expect(screen.getByText('North Harbor FC goal')).toBeInTheDocument();
+    expect(playSpy).not.toHaveBeenCalled();
     expect(setIntervalSpy).toHaveBeenCalledTimes(1);
     expect(vi.getTimerCount()).toBe(1);
-    expect(screen.getAllByText('Kickoff')).toHaveLength(1);
-    expect(screen.getAllByText('North Harbor FC goal')).toHaveLength(1);
-    expect(playSpy).toHaveBeenCalledTimes(1);
 
     await act(async () => {
-      await vi.advanceTimersByTimeAsync(56_000);
+      await vi.advanceTimersByTimeAsync(208_000);
     });
 
-    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
-    expect(vi.getTimerCount()).toBe(1);
-    expect(screen.getAllByText('Kickoff')).toHaveLength(1);
-    expect(screen.getAllByText('North Harbor FC goal')).toHaveLength(1);
+    expect(screen.getByText('Eastgate City goal')).toBeInTheDocument();
     expect(playSpy).toHaveBeenCalledTimes(1);
-    expect(clearIntervalSpy).not.toHaveBeenCalled();
+    expect(setIntervalSpy).toHaveBeenCalledTimes(1);
   });
 });
 
 function stubMatches() {
   vi.stubGlobal(
     'fetch',
-    vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        matches: demoMatches,
-        source: 'demo',
-        fetchedAt: '2026-06-23T12:00:00Z',
-        isFallback: true,
-        message: 'Demo data is shown because live World Cup data is not configured.',
-      }),
+    vi.fn(async (input: unknown) => {
+      const url = String(input);
+      if (url.includes('/api/match-sessions')) {
+        return {
+          ok: false,
+          status: 503,
+          json: async () => ({ title: 'Match sessions unavailable' }),
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
+          matches: demoMatches,
+          source: 'demo',
+          fetchedAt: '2026-06-23T12:00:00Z',
+          isFallback: true,
+          message: 'Demo data is shown because live World Cup data is not configured.',
+        }),
+      };
     }),
   );
 }
@@ -290,17 +318,30 @@ function setAudioMetadata(audio: HTMLAudioElement, { currentTime, duration }: { 
       currentTimeValue = value;
     },
   });
-  Object.defineProperty(audio, 'duration', {
-    configurable: true,
-    get: () => duration,
-  });
+  Object.defineProperty(audio, 'duration', { configurable: true, get: () => duration });
 }
 
-async function completeDemoSetup(user: ReturnType<typeof userEvent.setup>, teamName: 'North Harbor FC' | 'Eastgate City') {
-  render(<MatchSetupFlow />);
+async function uploadLocalFile(user: ReturnType<typeof userEvent.setup>, name: string, type = 'audio/mpeg') {
+  await user.upload(screen.getByLabelText('Choose a local audio file'), new File(['local anthem'], name, { type }));
+}
 
+async function completeReadySetup(user: ReturnType<typeof userEvent.setup>) {
   await user.click(await screen.findByRole('button', { name: /North Harbor FC/i }));
-  await user.click(screen.getByRole('button', { name: new RegExp(teamName, 'i') }));
-  await user.click(screen.getByRole('button', { name: /Stadium Pulse/i }));
-  await user.click(screen.getByRole('button', { name: 'Mark ready' }));
+  await user.click(screen.getByRole('button', { name: /North Harbor FC/i }));
+  await uploadLocalFile(user, 'supporter-anthem.mp3');
+  await user.click(screen.getByRole('button', { name: 'Continue to cue point' }));
+  await user.click(screen.getByRole('button', { name: 'Save cue point' }));
+}
+
+async function startLocalFallbackMatchMode() {
+  fireEvent.click(screen.getByRole('button', { name: 'Start when kickoff happens on TV' }));
+
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  expect(screen.getByRole('heading', { name: 'Remote match mode is unavailable' })).toBeInTheDocument();
+
+  fireEvent.click(screen.getByRole('button', { name: 'Use local demo mode' }));
 }

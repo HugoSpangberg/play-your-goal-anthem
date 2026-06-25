@@ -1,13 +1,17 @@
 using GoalAnthem.Api.Endpoints;
+using GoalAnthem.Api.Hubs;
 using GoalAnthem.Application;
+using GoalAnthem.Application.MatchSessions;
 using GoalAnthem.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks();
+builder.Services.AddSignalR();
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure();
+builder.Services.AddSingleton<IMatchSessionNotifier, SignalRMatchSessionNotifier>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("LocalWeb", policy =>
@@ -15,7 +19,8 @@ builder.Services.AddCors(options =>
         policy
             .WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
             .AllowAnyHeader()
-            .AllowAnyMethod();
+            .AllowAnyMethod()
+            .AllowCredentials();
     });
 });
 
@@ -39,6 +44,7 @@ if (app.Environment.IsDevelopment())
 
 app.MapHealthChecks("/health");
 app.MapDemoMatchesEndpoints();
+app.MapMatchSessionEndpoints();
 
 app.Run();
 

@@ -10,7 +10,9 @@ Find match -> Choose team -> Choose anthem -> Set cue point -> Start match -> Ev
 
 ## Current Scope
 
-The current implementation covers the setup and local match-mode demo: loading selectable matches from optional live World Cup data or deterministic demo fallback, selecting a match and team, choosing a deterministic demo anthem or local audio file, setting a cue point, starting match mode, and playing the anthem when the supported team scores in the local simulation.
+The current implementation covers setup, backend-owned deterministic match sessions, local fallback match mode, and local audio import: loading selectable matches from optional live World Cup data or deterministic demo fallback, selecting a match and team, importing a local audio file, setting a cue point, starting match mode, receiving authoritative backend session snapshots over SignalR, and playing the imported local audio when the supported team scores.
+
+Users can open an external royalty-free discovery site such as Pixabay Music, download a track directly from that site, return to GoalAnthem, and import the downloaded file as browser-local audio. Optional source metadata is only a user-maintained record.
 
 ## Users
 
@@ -20,7 +22,8 @@ The primary audience for the repository is technical recruiters evaluating engin
 
 - The demo must run without API keys, paid services, or external sports-data subscriptions.
 - Optional World Cup match data may be enabled with a local football-data.org token.
-- Spotify is optional future work and must not be required for the primary demo.
+- The automatic anthem source is a local browser audio file, including files downloaded separately from royalty-free discovery sites such as Pixabay.
+- Pixabay is not a streaming provider, API dependency, account flow, or legal-verification system.
 - Demo data must be deterministic and version-controlled.
 - Documentation must not claim unimplemented behavior.
 
@@ -31,9 +34,11 @@ The primary audience for the repository is technical recruiters evaluating engin
 - A user can manually refresh matches without request spam.
 - A user can select a match and immediately move into team selection.
 - A user can select either the home or away team and continue to anthem selection.
-- A user can choose a deterministic demo anthem or a local audio file.
-- A user can set and validate a cue point, preview playback, and start match mode from the Ready summary.
-- A deterministic match mode updates the clock, score, and timeline after local kickoff synchronization.
+- A user can import a local audio file and cannot continue to cue-point setup until the file is valid.
+- A user can use the Pixabay guide, import a downloaded local file, and optionally record source metadata.
+- A user can set and validate a cue point, preview playback, and start match mode from the Ready summary by pressing start when kickoff is visible on the TV or stream.
+- A backend-owned deterministic match session updates the clock, score, and timeline after local kickoff synchronization.
+- A user can explicitly fall back to local demo mode if remote session startup is unavailable.
 - Supported-team goals trigger anthem playback from the cue point, while opponent goals do not.
 - A user can manually trigger playback, stop playback, and end match mode.
 - The API exposes documented provider-neutral match data and safe fallback metadata.

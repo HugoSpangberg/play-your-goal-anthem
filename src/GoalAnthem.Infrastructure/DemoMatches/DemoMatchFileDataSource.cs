@@ -43,8 +43,8 @@ public sealed class DemoMatchFileDataSource(
             new MatchId(record.Id),
             record.KickoffTime,
             status,
-            Team.Create(new TeamId(record.HomeTeam.Id), record.HomeTeam.Name),
-            Team.Create(new TeamId(record.AwayTeam.Id), record.AwayTeam.Name));
+            Team.Create(new TeamId(record.HomeTeam.Id), record.HomeTeam.Name, record.HomeTeam.CountryCode),
+            Team.Create(new TeamId(record.AwayTeam.Id), record.AwayTeam.Name, record.AwayTeam.CountryCode));
     }
 
     private sealed record DemoMatchDocument(IReadOnlyList<DemoMatchRecord> Matches);
@@ -56,5 +56,5 @@ public sealed class DemoMatchFileDataSource(
         TeamRecord HomeTeam,
         TeamRecord AwayTeam);
 
-    private sealed record TeamRecord(string Id, string Name);
+    private sealed record TeamRecord(string Id, string Name, string? CountryCode);
 }

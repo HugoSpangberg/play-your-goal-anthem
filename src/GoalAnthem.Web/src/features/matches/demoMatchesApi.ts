@@ -9,6 +9,7 @@ export type DemoMatch = {
 export type Team = {
   id: string;
   name: string;
+  countryCode?: string | null;
 };
 
 export type MatchDataSource = 'demo' | 'liveWorldCup';

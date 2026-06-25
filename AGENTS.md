@@ -24,7 +24,7 @@ Find match -> Choose team -> Choose anthem -> Set cue point -> Start match -> Pl
 - Use explicit domain types when they prevent invalid states.
 - Use `CancellationToken` in asynchronous flows.
 - Validate and map external or file-backed data at boundaries.
-- Keep Spotify, live football data, and any other external providers behind explicit boundaries and only add them when the feature requires it.
+- Keep live football data and any other external providers behind explicit boundaries and only add them when the feature requires it.
 
 ## Frontend Conventions
 
@@ -44,7 +44,7 @@ Find match -> Choose team -> Choose anthem -> Set cue point -> Start match -> Pl
 
 - Never commit secrets, tokens, machine-specific settings, or generated credentials.
 - Do not commit copyrighted audio or bundled music files.
-- The main demo must remain usable without Spotify or external football APIs.
+- The main demo must remain usable without accounts, paid music services, or external football APIs.
 
 ## Testing And Verification
 
