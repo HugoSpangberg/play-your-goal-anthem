@@ -34,6 +34,8 @@ public static class DependencyInjection
         services.AddSingleton<ILiveMatchFeedProvider, ApiFootballProviderPlaceholder>();
         services.AddSingleton<AdaptiveMatchSessionService>();
         services.AddSingleton<IMatchSessionService>(provider => provider.GetRequiredService<AdaptiveMatchSessionService>());
+        services.AddSingleton<LiveProviderTelemetry>();
+        services.AddSingleton<ILiveProviderHealthReader>(provider => provider.GetRequiredService<LiveProviderTelemetry>());
         services.AddHostedService<LiveRefreshHostedService>();
         return services;
     }
