@@ -1,3 +1,4 @@
+using GoalAnthem.Application.LiveMatches;
 using GoalAnthem.Application.Matches.GetMatches;
 
 namespace GoalAnthem.Api.Endpoints;
@@ -35,8 +36,15 @@ public static class DemoMatchesEndpoints
             Results.Ok(healthReader.GetHealth()))
             .WithName("GetMatchesProviderHealth")
             .WithSummary("Get match provider health")
-            .WithDescription("Reports whether the optional live provider is configured without exposing secrets.")
+            .WithDescription("Reports whether the optional fixture provider is configured without exposing secrets.")
             .Produces<MatchProviderHealth>();
+
+        app.MapGet("/health/live-providers", (ILiveProviderHealthReader healthReader) =>
+            Results.Ok(healthReader.GetHealth()))
+            .WithName("GetLiveProvidersHealth")
+            .WithSummary("Get live observation provider health")
+            .WithDescription("Reports configured state, polling interval, freshness, backoff, and quota metadata without exposing credentials.")
+            .Produces<IReadOnlyList<LiveProviderHealthDto>>();
 
         return app;
     }
