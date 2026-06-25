@@ -9,6 +9,7 @@ public sealed class LiveRefreshHostedService(
     AdaptiveMatchSessionService sessions,
     IEnumerable<ILiveMatchFeedProvider> providers,
     ConfiguredMatchProvider footballDataProvider,
+    LiveProviderTelemetry telemetry,
     ILogger<LiveRefreshHostedService> logger,
     TimeProvider timeProvider)
     : IHostedService, IAsyncDisposable
@@ -26,7 +27,9 @@ public sealed class LiveRefreshHostedService(
         var now = timeProvider.GetUtcNow();
         foreach (var source in sources)
         {
-            nextRun[source.Name] = now + source.InitialDelay;
+            var dueAt = now + source.InitialDelay;
+            nextRun[source.Name] = dueAt;
+            telemetry.Initialize(source, dueAt);
         }
 
         timer = timeProvider.CreateTimer(
@@ -75,7 +78,9 @@ public sealed class LiveRefreshHostedService(
                     continue;
                 }
 
-                nextRun[source.Name] = now + source.PollInterval;
+                var scheduledNext = now + source.PollInterval;
+                nextRun[source.Name] = scheduledNext;
+                telemetry.MarkAttempt(source, now, scheduledNext);
                 await ApplySourceAsync(source, activeSessions, now, cancellationToken);
             }
         }
@@ -102,20 +107,29 @@ public sealed class LiveRefreshHostedService(
                     await sessions.ApplyLiveObservationAsync(session.SessionId, observation, cancellationToken);
                 }
             }
+
+            var completedAt = timeProvider.GetUtcNow();
+            telemetry.MarkSuccess(source, completedAt, nextRun[source.Name]);
         }
         catch (LiveProviderRateLimitException exception)
         {
-            nextRun[source.Name] = now + (exception.RetryAfter ?? TimeSpan.FromMinutes(2));
+            var retryAt = now + (exception.RetryAfter ?? TimeSpan.FromMinutes(2));
+            nextRun[source.Name] = retryAt;
+            telemetry.MarkFailure(source, now, retryAt, "rate-limited", exception.Message);
             logger.LogWarning("Provider {ProviderName} was rate-limited.", source.Name);
         }
-        catch (LiveProviderQuotaExceededException)
+        catch (LiveProviderQuotaExceededException exception)
         {
-            nextRun[source.Name] = now + TimeSpan.FromHours(6);
+            var retryAt = now + TimeSpan.FromHours(6);
+            nextRun[source.Name] = retryAt;
+            telemetry.MarkFailure(source, now, retryAt, "quota-exhausted", exception.Message);
             logger.LogWarning("Provider {ProviderName} reached its safety budget.", source.Name);
         }
         catch (HttpRequestException exception)
         {
-            nextRun[source.Name] = now + TimeSpan.FromMinutes(2);
+            var retryAt = now + TimeSpan.FromMinutes(2);
+            nextRun[source.Name] = retryAt;
+            telemetry.MarkFailure(source, now, retryAt, "degraded", exception.Message);
             logger.LogWarning(exception, "Provider {ProviderName} was temporarily unavailable.", source.Name);
         }
     }
