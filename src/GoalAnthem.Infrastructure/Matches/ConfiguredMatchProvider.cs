@@ -85,7 +85,7 @@ public sealed class ConfiguredMatchProvider(
 
                 return result;
             }
-            catch (FootballDataRateLimitException exception)
+            catch (LiveProviderRateLimitException exception)
             {
                 logger.LogWarning(exception, "football-data.org rate limit was reached while loading World Cup matches.");
                 return await HandleProviderFailureAsync(now, "World Cup API data is temporarily rate-limited.", cancellationToken);
@@ -322,6 +322,4 @@ public sealed class ConfiguredMatchProvider(
     private sealed record FootballDataScore(FootballDataScorePart? FullTime);
 
     private sealed record FootballDataScorePart(int? Home, int? Away);
-
-    private sealed class FootballDataRateLimitException : Exception;
 }
