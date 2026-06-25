@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Headers;
 using System.Text.Json;
+using GoalAnthem.Application.LiveMatches;
 using GoalAnthem.Application.Matches.GetMatches;
 using GoalAnthem.Domain.Matches;
 using GoalAnthem.Infrastructure.DemoMatches;
@@ -15,7 +16,7 @@ public sealed class ConfiguredMatchProvider(
     IOptions<FootballDataOptions> options,
     ILogger<ConfiguredMatchProvider> logger,
     TimeProvider timeProvider)
-    : IMatchProvider, IMatchProviderHealthReader
+    : IMatchProvider, IMatchProviderHealthReader, ILiveMatchFeedProvider
 {
     private static readonly JsonSerializerOptions JsonOptions = new(JsonSerializerDefaults.Web);
     private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(10);
@@ -25,6 +26,18 @@ public sealed class ConfiguredMatchProvider(
     private DateTimeOffset? lastRefreshAttempt;
     private DateTimeOffset? lastFailedFetch;
     private string? lastFailure;
+
+    public string Name => "football-data.org";
+
+    public bool IsConfigured => !string.IsNullOrWhiteSpace(options.Value.ApiToken);
+
+    public TimeSpan PollInterval => TimeSpan.FromMinutes(5);
+
+    public TimeSpan InitialDelay => TimeSpan.FromSeconds(43);
+
+    public int? RequestsUsedToday => null;
+
+    public int? RequestsRemainingToday => null;
 
     public async Task<MatchProviderResult> GetMatchesAsync(MatchProviderRequest request, CancellationToken cancellationToken)
     {
@@ -72,7 +85,7 @@ public sealed class ConfiguredMatchProvider(
 
                 return result;
             }
-            catch (FootballDataRateLimitException exception)
+            catch (LiveProviderRateLimitException exception)
             {
                 logger.LogWarning(exception, "football-data.org rate limit was reached while loading World Cup matches.");
                 return await HandleProviderFailureAsync(now, "World Cup API data is temporarily rate-limited.", cancellationToken);
@@ -87,6 +100,23 @@ public sealed class ConfiguredMatchProvider(
         {
             refreshLock.Release();
         }
+    }
+
+    public async Task<IReadOnlyList<LiveMatchObservation>> GetLiveMatchesAsync(CancellationToken cancellationToken)
+    {
+        var token = options.Value.ApiToken;
+        if (string.IsNullOrWhiteSpace(token))
+        {
+            return [];
+        }
+
+        var document = await FetchWorldCupResponseAsync(token, cancellationToken);
+        var observedAt = timeProvider.GetUtcNow();
+        return document.Matches?
+            .Select(record => MapLive(record, observedAt))
+            .Where(observation => observation is not null)
+            .Cast<LiveMatchObservation>()
+            .ToArray() ?? [];
     }
 
     public MatchProviderHealth GetHealth()
@@ -143,6 +173,18 @@ public sealed class ConfiguredMatchProvider(
 
     private async Task<IReadOnlyList<DemoMatch>> FetchWorldCupMatchesAsync(string token, CancellationToken cancellationToken)
     {
+        var document = await FetchWorldCupResponseAsync(token, cancellationToken);
+        return document.Matches?
+            .Select(Map)
+            .Where(match => match is not null)
+            .Cast<DemoMatch>()
+            .OrderBy(match => match.KickoffTime)
+            .ThenBy(match => match.Id.Value, StringComparer.Ordinal)
+            .ToArray() ?? [];
+    }
+
+    private async Task<FootballDataMatchesResponse> FetchWorldCupResponseAsync(string token, CancellationToken cancellationToken)
+    {
         using var request = new HttpRequestMessage(HttpMethod.Get, "v4/competitions/WC/matches");
         request.Headers.Add("X-Auth-Token", token);
         request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
@@ -152,26 +194,13 @@ public sealed class ConfiguredMatchProvider(
 
         if (response.StatusCode == (HttpStatusCode)429)
         {
-            throw new FootballDataRateLimitException();
+            throw new LiveProviderRateLimitException(GetRetryAfter(response));
         }
 
         response.EnsureSuccessStatusCode();
-
         await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-        var document = await JsonSerializer.DeserializeAsync<FootballDataMatchesResponse>(stream, JsonOptions, cancellationToken);
-
-        if (document?.Matches is null)
-        {
-            throw new InvalidOperationException("football-data.org returned a malformed match response.");
-        }
-
-        return document.Matches
-            .Select(Map)
-            .Where(match => match is not null)
-            .Cast<DemoMatch>()
-            .OrderBy(match => match.KickoffTime)
-            .ThenBy(match => match.Id.Value, StringComparer.Ordinal)
-            .ToArray();
+        return await JsonSerializer.DeserializeAsync<FootballDataMatchesResponse>(stream, JsonOptions, cancellationToken)
+            ?? throw new InvalidOperationException("football-data.org returned a malformed match response.");
     }
 
     private static DemoMatch? Map(FootballDataMatchRecord record)
@@ -202,6 +231,46 @@ public sealed class ConfiguredMatchProvider(
                 CountryCodeResolver.Resolve(record.AwayTeam.Tla, record.AwayTeam.Name)));
     }
 
+    private static LiveMatchObservation? MapLive(FootballDataMatchRecord record, DateTimeOffset observedAt)
+    {
+        if (record.Id is null or <= 0 ||
+            string.IsNullOrWhiteSpace(record.UtcDate) ||
+            record.HomeTeam is null ||
+            record.AwayTeam is null ||
+            string.IsNullOrWhiteSpace(record.HomeTeam.Name) ||
+            string.IsNullOrWhiteSpace(record.AwayTeam.Name) ||
+            !DateTimeOffset.TryParse(record.UtcDate, out var kickoffTime))
+        {
+            return null;
+        }
+
+        var status = record.Status?.ToUpperInvariant() switch
+        {
+            "IN_PLAY" => "live",
+            "PAUSED" => "half-time",
+            "FINISHED" => "ended",
+            _ => null,
+        };
+        if (status is null)
+        {
+            return null;
+        }
+
+        return new LiveMatchObservation(
+            "football-data.org",
+            record.Id.Value.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            kickoffTime,
+            observedAt,
+            record.HomeTeam.Name,
+            record.AwayTeam.Name,
+            CountryCodeResolver.Resolve(record.HomeTeam.Tla, record.HomeTeam.Name),
+            CountryCodeResolver.Resolve(record.AwayTeam.Tla, record.AwayTeam.Name),
+            Math.Max(0, record.Score?.FullTime?.Home ?? 0),
+            Math.Max(0, record.Score?.FullTime?.Away ?? 0),
+            status,
+            null);
+    }
+
     private static bool TryMapStatus(string? value, out MatchStatus status)
     {
         status = MatchStatus.Upcoming;
@@ -221,6 +290,21 @@ public sealed class ConfiguredMatchProvider(
         }
     }
 
+    private static TimeSpan? GetRetryAfter(HttpResponseMessage response)
+    {
+        if (response.Headers.RetryAfter?.Delta is { } delta)
+        {
+            return delta;
+        }
+
+        if (response.Headers.RetryAfter?.Date is { } date)
+        {
+            return date - DateTimeOffset.UtcNow;
+        }
+
+        return null;
+    }
+
     private sealed record CacheEntry(MatchProviderResult Result, DateTimeOffset ExpiresAt);
 
     private sealed record FootballDataMatchesResponse(IReadOnlyList<FootballDataMatchRecord>? Matches);
@@ -230,9 +314,12 @@ public sealed class ConfiguredMatchProvider(
         string? UtcDate,
         string? Status,
         FootballDataTeamRecord? HomeTeam,
-        FootballDataTeamRecord? AwayTeam);
+        FootballDataTeamRecord? AwayTeam,
+        FootballDataScore? Score);
 
     private sealed record FootballDataTeamRecord(int? Id, string? Name, string? Tla);
 
-    private sealed class FootballDataRateLimitException : Exception;
+    private sealed record FootballDataScore(FootballDataScorePart? FullTime);
+
+    private sealed record FootballDataScorePart(int? Home, int? Away);
 }
