@@ -3,7 +3,6 @@ using GoalAnthem.Application.Matches.GetMatches;
 using GoalAnthem.Application.MatchSessions;
 using GoalAnthem.Infrastructure.DemoMatches;
 using GoalAnthem.Infrastructure.LiveMatches;
-using GoalAnthem.Infrastructure.MatchSessions;
 using GoalAnthem.Infrastructure.Matches;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -33,9 +32,9 @@ public static class DependencyInjection
         services.AddSingleton<IMatchProviderHealthReader>(provider => provider.GetRequiredService<ConfiguredMatchProvider>());
         services.AddSingleton<ILiveMatchFeedProvider, OpenLigaDbLiveMatchProvider>();
         services.AddSingleton<ILiveMatchFeedProvider, ApiFootballProviderPlaceholder>();
-        services.AddSingleton<InMemoryMatchSessionService>();
-        services.AddSingleton<IMatchSessionService>(provider => provider.GetRequiredService<InMemoryMatchSessionService>());
-        services.AddHostedService<MatchSessionWorker>();
+        services.AddSingleton<AdaptiveMatchSessionService>();
+        services.AddSingleton<IMatchSessionService>(provider => provider.GetRequiredService<AdaptiveMatchSessionService>());
+        services.AddHostedService<LiveRefreshHostedService>();
         return services;
     }
 }
